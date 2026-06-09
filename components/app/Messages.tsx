@@ -67,7 +67,7 @@ export function Messages({
           await saveMessage(sessionId, phoneNumber, "inbound", content);
           
           // If currently viewing this customer, update state
-          if (selectedCustomer && selectedCustomer.phone === phoneNumber) {
+          if (selectedCustomer && selectedCustomer.phone && selectedCustomer.phone.endsWith(phoneNumber.slice(-9))) {
             setMessages((prev) => [...prev, { direction: "inbound", content, created_at: new Date().toISOString() }]);
           }
         }
@@ -86,7 +86,7 @@ export function Messages({
         await saveMessage(sessionId, phoneNumber, "outbound", data.text);
         
         const currentCustomer = selectedCustomerRef.current;
-        if (currentCustomer && currentCustomer.phone === phoneNumber) {
+        if (currentCustomer && currentCustomer.phone && currentCustomer.phone.endsWith(phoneNumber.slice(-9))) {
           setMessages((prev) => [...prev, { direction: "outbound", content: data.text, created_at: new Date().toISOString() }]);
         }
       }
