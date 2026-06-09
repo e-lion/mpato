@@ -8,6 +8,7 @@ import { TILES } from "@/lib/mockData";
 import { CATEGORIES, type Customer, type Product } from "@/lib/data/types";
 import type { StoreSettings } from "@/lib/data/queries";
 import { recordSale } from "@/app/actions/sales";
+import { initiateStkPush, checkStkPushStatus } from "@/app/actions/mpesa";
 import { Receipt, type ReceiptData } from "./Receipt";
 
 type Cart = Record<string, number>;
@@ -39,6 +40,10 @@ export function POS({
   const [error, setError] = useState<string | null>(null);
   const [mpesaPrompt, setMpesaPrompt] = useState(false);
   const [mpesaRef, setMpesaRef] = useState("");
+  const [stkPhone, setStkPhone] = useState("");
+  const [stkRequestId, setStkRequestId] = useState<string | null>(null);
+  const [stkStatus, setStkStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [manualMpesa, setManualMpesa] = useState(false);
 
   const defaultMethod = settings?.defaultPaymentMethod ?? "mpesa";
   const searchParams = useSearchParams();
@@ -139,19 +144,71 @@ export function POS({
   const openMpesa = () => {
     setError(null);
     setMpesaRef("");
+    setStkRequestId(null);
+    setStkStatus("idle");
+    setStkPhone(selectedCustomer?.phone || "");
+    setManualMpesa(false);
     setMpesaPrompt(true);
   };
 
   const cancelMpesa = () => {
-    if (isPending) return;
+    if (isPending || stkStatus === "pending") return;
     setMpesaPrompt(false);
     setMpesaRef("");
+    setStkRequestId(null);
     setError(null);
   };
 
   const confirmMpesa = () => {
     submit("mpesa", mpesaRef.trim().toUpperCase() || undefined);
   };
+
+  const handleStkPush = async () => {
+    setError(null);
+    if (!stkPhone) {
+      setError("Please enter a phone number");
+      return;
+    }
+    setStkStatus("pending");
+    const res = await initiateStkPush(subtotal, stkPhone);
+    if (!res.ok) {
+      setError(res.error);
+      setStkStatus("failed");
+      return;
+    }
+    setStkRequestId(res.checkoutRequestId!);
+  };
+
+  useEffect(() => {
+    let active = true;
+    let timer: NodeJS.Timeout;
+
+    const poll = async () => {
+      if (!stkRequestId || stkStatus !== "pending") return;
+      const pollRes = await checkStkPushStatus(stkRequestId);
+      if (!active) return;
+
+      if (pollRes.status === "success") {
+        setStkStatus("success");
+        submit("mpesa", pollRes.receipt);
+      } else if (pollRes.status === "failed") {
+        setStkStatus("failed");
+        setError(pollRes.error || "M-PESA request failed");
+      } else {
+        timer = setTimeout(poll, 2000);
+      }
+    };
+
+    if (stkRequestId && stkStatus === "pending") {
+      timer = setTimeout(poll, 2000);
+    }
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stkRequestId, stkStatus]);
 
   const reset = () => {
     setDone(null);
@@ -565,52 +622,113 @@ export function POS({
                 )}
               </div>
             )}
-            <label
-              style={{
-                display: "block",
-                textAlign: "left",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--fg2)",
-                marginBottom: 6,
-              }}
-              htmlFor="mpesa-ref"
-            >
-              M-PESA confirmation code
-            </label>
-            <input
-              id="mpesa-ref"
-              autoFocus
-              className="mono"
-              placeholder="e.g. QGH7X2P1LM"
-              value={mpesaRef}
-              maxLength={12}
-              onChange={(e) =>
-                setMpesaRef(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmMpesa();
-                if (e.key === "Escape") cancelMpesa();
-              }}
-              style={{
-                width: "100%",
-                fontSize: 18,
-                letterSpacing: "2px",
-                textAlign: "center",
-                padding: "12px 14px",
-                border: "1.5px solid var(--border)",
-                borderRadius: "var(--r-md)",
-                background: "var(--surface)",
-                color: "var(--fg1)",
-                outline: "none",
-                marginBottom: 6,
-                textTransform: "uppercase",
-              }}
-            />
-            <p style={{ color: "var(--fg3)", fontSize: 12, margin: "0 0 16px" }}>
-              Type the code from the customer&apos;s M-PESA SMS. Leave blank to
-              record without a code.
-            </p>
+            
+            {!manualMpesa ? (
+              <div style={{ marginBottom: 16 }}>
+                <label
+                  style={{ display: "block", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--fg2)", marginBottom: 6 }}
+                >
+                  Customer Phone Number
+                </label>
+                <input
+                  autoFocus
+                  placeholder="e.g. 0712345678"
+                  value={stkPhone}
+                  onChange={(e) => setStkPhone(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleStkPush();
+                    if (e.key === "Escape") cancelMpesa();
+                  }}
+                  disabled={stkStatus === "pending"}
+                  style={{
+                    width: "100%", fontSize: 18, padding: "12px 14px", border: "1.5px solid var(--border)",
+                    borderRadius: "var(--r-md)", background: "var(--surface)", color: "var(--fg1)", outline: "none",
+                    marginBottom: 10,
+                  }}
+                />
+                {stkStatus === "pending" && (
+                  <div style={{ fontSize: 13, color: "var(--primary)", fontWeight: 600, textAlign: "center", marginBottom: 10 }}>
+                    <Icon name="loader" size={14} className="spin" /> Waiting for customer to enter PIN...
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                  <Btn variant="secondary" block onClick={cancelMpesa} disabled={isPending || stkStatus === "pending"}>
+                    Cancel
+                  </Btn>
+                  <Btn variant="mpesa" block icon="send" onClick={handleStkPush} disabled={isPending || stkStatus === "pending"}>
+                    {stkStatus === "pending" ? "Waiting..." : "Send Request"}
+                  </Btn>
+                </div>
+                <button
+                  onClick={() => setManualMpesa(true)}
+                  disabled={stkStatus === "pending"}
+                  style={{
+                    background: "none", border: "none", color: "var(--fg3)", fontSize: 13, textDecoration: "underline",
+                    cursor: "pointer", marginTop: 16, width: "100%"
+                  }}
+                >
+                  Enter receipt manually instead
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 16 }}>
+                <label
+                  style={{
+                    display: "block",
+                    textAlign: "left",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--fg2)",
+                    marginBottom: 6,
+                  }}
+                  htmlFor="mpesa-ref"
+                >
+                  M-PESA confirmation code
+                </label>
+                <input
+                  id="mpesa-ref"
+                  autoFocus
+                  className="mono"
+                  placeholder="e.g. QGH7X2P1LM"
+                  value={mpesaRef}
+                  maxLength={12}
+                  onChange={(e) =>
+                    setMpesaRef(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmMpesa();
+                    if (e.key === "Escape") cancelMpesa();
+                  }}
+                  style={{
+                    width: "100%",
+                    fontSize: 18,
+                    letterSpacing: "2px",
+                    textAlign: "center",
+                    padding: "12px 14px",
+                    border: "1.5px solid var(--border)",
+                    borderRadius: "var(--r-md)",
+                    background: "var(--surface)",
+                    color: "var(--fg1)",
+                    outline: "none",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                  }}
+                />
+                <p style={{ color: "var(--fg3)", fontSize: 12, margin: "0 0 16px" }}>
+                  Type the code from the customer&apos;s M-PESA SMS. Leave blank to
+                  record without a code.
+                </p>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Btn variant="secondary" block onClick={() => setManualMpesa(false)} disabled={isPending}>
+                    Back
+                  </Btn>
+                  <Btn variant="mpesa" block icon="check" onClick={confirmMpesa} disabled={isPending}>
+                    {isPending ? "Recording…" : "Confirm payment"}
+                  </Btn>
+                </div>
+              </div>
+            )}
+            
             {error && (
               <div
                 style={{
@@ -619,21 +737,13 @@ export function POS({
                   padding: "8px 12px",
                   borderRadius: "var(--r-md)",
                   fontSize: 13,
-                  marginBottom: 12,
+                  marginTop: 12,
                   textAlign: "left",
                 }}
               >
                 {error}
               </div>
             )}
-            <div style={{ display: "flex", gap: 10 }}>
-              <Btn variant="secondary" block onClick={cancelMpesa} disabled={isPending}>
-                Cancel
-              </Btn>
-              <Btn variant="mpesa" block icon="check" onClick={confirmMpesa} disabled={isPending}>
-                {isPending ? "Recording…" : "Confirm payment"}
-              </Btn>
-            </div>
           </div>
         </div>
       )}
