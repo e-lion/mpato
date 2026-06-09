@@ -154,7 +154,7 @@ export function POS({
   };
 
   const cancelMpesa = () => {
-    if (isPending || stkStatus === "pending") return;
+    if (isPending) return;
     setMpesaPrompt(false);
     setMpesaRef("");
     setStkRequestId(null);
@@ -691,7 +691,7 @@ export function POS({
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                  <Btn variant="secondary" block onClick={cancelMpesa} disabled={isPending || stkStatus === "pending"}>
+                  <Btn variant="secondary" block onClick={cancelMpesa} disabled={isPending}>
                     Cancel
                   </Btn>
                   <Btn variant="mpesa" block icon="send" onClick={handleStkPush} disabled={isPending || stkStatus === "pending"}>
@@ -699,8 +699,12 @@ export function POS({
                   </Btn>
                 </div>
                 <button
-                  onClick={() => setManualMpesa(true)}
-                  disabled={stkStatus === "pending"}
+                  type="button"
+                  onClick={() => {
+                    setStkStatus("idle");
+                    setManualMpesa(true);
+                  }}
+                  disabled={isPending}
                   style={{
                     background: "none", border: "none", color: "var(--fg3)", fontSize: 13, textDecoration: "underline",
                     cursor: "pointer", marginTop: 16, width: "100%"
