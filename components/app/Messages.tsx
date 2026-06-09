@@ -23,6 +23,12 @@ export function Messages({
   
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Keep track of the currently selected customer without triggering socket reconnects
+  const selectedCustomerRef = useRef<Customer | null>(null);
+  useEffect(() => {
+    selectedCustomerRef.current = selectedCustomer;
+  }, [selectedCustomer]);
 
   const sessionId = storeId;
 
@@ -68,13 +74,19 @@ export function Messages({
       }
     });
 
-    socket.on("message_sent", async (data: { sessionId: string; to: string; text: string; success: boolean }) => {
-      if (data.sessionId === sessionId && data.success) {
+    socket.on("message_sent", async (data: { sessionId: string; to: string; text: string; success: boolean, error?: string }) => {
+      if (data.sessionId === sessionId) {
+        if (!data.success) {
+          alert("Failed to send message: " + data.error);
+          return;
+        }
+
         const phoneNumber = data.to.split("@")[0];
         
         await saveMessage(sessionId, phoneNumber, "outbound", data.text);
         
-        if (selectedCustomer && selectedCustomer.phone === phoneNumber) {
+        const currentCustomer = selectedCustomerRef.current;
+        if (currentCustomer && currentCustomer.phone === phoneNumber) {
           setMessages((prev) => [...prev, { direction: "outbound", content: data.text, created_at: new Date().toISOString() }]);
         }
       }
@@ -83,7 +95,7 @@ export function Messages({
     return () => {
       socket.disconnect();
     };
-  }, [sessionId, selectedCustomer]);
+  }, [sessionId]);
 
   // Load chat history when customer is selected
   useEffect(() => {

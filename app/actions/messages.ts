@@ -20,7 +20,7 @@ export async function saveMessage(
     .maybeSingle();
 
   if (customerData) {
-    customerId = customerData.id;
+    customerId = (customerData as any).id;
   }
 
   const { error } = await supabase.from("mpato_whatsapp_messages").insert({
