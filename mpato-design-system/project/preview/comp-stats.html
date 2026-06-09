@@ -1,0 +1,25 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.tile{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-sm);}
+.top{display:flex;align-items:center;justify-content:space-between;}
+.ic{width:34px;height:34px;border-radius:var(--r-md);display:grid;place-items:center;}
+.ic svg{width:17px;height:17px;}
+.lab{font-size:12px;font-weight:600;color:var(--fg3);margin-top:14px;}
+.val{font-family:var(--font-display);font-weight:800;font-size:26px;letter-spacing:-1px;color:var(--fg1);margin-top:2px;}
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;margin-top:6px;}
+.delta svg{width:13px;height:13px;}
+.up{color:var(--success-fg);}.down{color:var(--danger-fg);}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--rose-500)"></span><span class="ttl">KPI stat tiles</span></div>
+<div class="grid">
+  <div class="tile"><div class="top"><div class="ic" style="background:var(--rose-50);color:var(--rose-700)"><i data-lucide="trending-up"></i></div></div><div class="lab">Sales today</div><div class="val">KES 84,200</div><div class="delta up"><i data-lucide="arrow-up-right"></i>12.4% vs yest.</div></div>
+  <div class="tile"><div class="top"><div class="ic" style="background:var(--peri-50);color:var(--peri-600)"><i data-lucide="receipt"></i></div></div><div class="lab">Orders</div><div class="val">156</div><div class="delta up"><i data-lucide="arrow-up-right"></i>8 more</div></div>
+  <div class="tile"><div class="top"><div class="ic" style="background:var(--apricot-50);color:var(--apricot-600)"><i data-lucide="package"></i></div></div><div class="lab">Low stock</div><div class="val">7</div><div class="delta down"><i data-lucide="arrow-down-right"></i>Restock soon</div></div>
+</div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script>
+</body></html>

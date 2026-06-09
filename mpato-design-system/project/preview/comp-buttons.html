@@ -1,0 +1,37 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.btn{font-family:var(--font-sans);font-weight:600;font-size:14px;border:1px solid transparent;border-radius:var(--r-md);padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;letter-spacing:-.1px;}
+.btn svg{width:16px;height:16px;}
+.b-primary{background:var(--brand);color:var(--brand-fg);}
+.b-primary:hover{background:var(--brand-hover);}
+.b-secondary{background:var(--white);color:var(--fg1);border-color:var(--border-strong);}
+.b-secondary:hover{background:var(--stone-50);}
+.b-ghost{background:transparent;color:var(--brand-text);}
+.b-ghost:hover{background:var(--rose-50);}
+.b-accent{background:var(--apricot-500);color:#fff;}
+.b-danger{background:var(--white);color:var(--danger-fg);border-color:var(--danger);}
+.b-sm{height:32px;font-size:13px;padding:0 12px;border-radius:var(--r-sm);}
+.b-lg{height:48px;font-size:16px;padding:0 22px;}
+.b-primary:disabled{background:var(--stone-200);color:var(--fg-disabled);cursor:not-allowed;}
+.r{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--rose-500)"></span><span class="ttl">Buttons</span></div>
+<div class="r">
+  <button class="btn b-primary"><i data-lucide="plus"></i>New sale</button>
+  <button class="btn b-secondary">Export</button>
+  <button class="btn b-ghost">View report</button>
+  <button class="btn b-accent"><i data-lucide="zap"></i>Charge</button>
+  <button class="btn b-danger">Void</button>
+</div>
+<div class="r">
+  <button class="btn b-primary b-sm">Small</button>
+  <button class="btn b-primary">Default</button>
+  <button class="btn b-primary b-lg">Large</button>
+  <button class="btn b-primary" disabled>Disabled</button>
+</div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script>
+</body></html>

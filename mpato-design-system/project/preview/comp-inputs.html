@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 18px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px;}
+.inp{width:100%;height:42px;border:1px solid var(--border-strong);border-radius:var(--r-md);padding:0 12px;font-family:var(--font-sans);font-size:14px;color:var(--fg1);background:var(--white);}
+.inp::placeholder{color:var(--fg-disabled);}
+.inp.focus{border-color:var(--rose-500);box-shadow:var(--ring);outline:none;}
+.search{display:flex;align-items:center;gap:8px;height:42px;border:1px solid var(--border-strong);border-radius:var(--r-md);padding:0 12px;color:var(--fg3);}
+.search svg{width:16px;height:16px;}
+.search input{border:none;outline:none;font-family:var(--font-sans);font-size:14px;width:100%;color:var(--fg1);}
+.prefix{display:flex;align-items:center;border:1px solid var(--border-strong);border-radius:var(--r-md);overflow:hidden;}
+.prefix .px{padding:0 11px;height:42px;display:flex;align-items:center;background:var(--stone-100);color:var(--fg2);font-size:13px;font-weight:600;font-family:var(--font-mono);}
+.prefix input{border:none;outline:none;height:42px;padding:0 12px;font-family:var(--font-sans);font-size:14px;width:100%;}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--stone-400)"></span><span class="ttl">Inputs &amp; fields</span></div>
+<div class="grid">
+  <div class="field"><label>Product name</label><input class="inp" placeholder="e.g. Sukari 1kg"></div>
+  <div class="field"><label>Focused</label><input class="inp focus" value="Maziwa Fresh 500ml"></div>
+  <div class="field"><label>Price</label><div class="prefix"><span class="px">KES</span><input value="120"></div></div>
+  <div class="field"><label>Search</label><div class="search"><i data-lucide="search"></i><input placeholder="Search inventory…"></div></div>
+</div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script>
+</body></html>

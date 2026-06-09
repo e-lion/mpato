@@ -1,0 +1,21 @@
+/* Shared chrome for Mpato Design System preview cards */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg1);
+  color: var(--fg1);
+  padding: 22px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; }
+.wrap { display: flex; flex-wrap: wrap; gap: 12px; }
+.swatch { display: flex; flex-direction: column; gap: 6px; }
+.chip { border-radius: var(--r-md); border: 1px solid rgba(33,30,24,.06); }
+.lab { font-size: 11px; color: var(--fg3); font-weight: 600; letter-spacing: .2px; }
+.val { font-family: var(--font-mono); font-size: 11px; color: var(--fg2); }
+.muted { color: var(--fg3); }
+.cardhead { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.dot { width:14px; height:14px; border-radius:5px; }
+.cardhead .ttl { font-family: var(--font-display); font-weight:700; font-size:17px; letter-spacing:-.3px; color:var(--fg1); }

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.pc{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;cursor:pointer;transition:var(--transition);}
+.pc:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.ph{height:74px;display:grid;place-items:center;}
+.ph svg{width:26px;height:26px;color:#fff;opacity:.9;}
+.bd{padding:9px 11px 11px;}
+.nm{font-size:13px;font-weight:600;color:var(--fg1);line-height:1.2;}
+.pr{font-family:var(--font-sans);font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:var(--fg1);margin-top:6px;}
+.st{font-size:11px;font-weight:600;color:var(--fg3);margin-top:3px;}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--apricot-500)"></span><span class="ttl">POS product cards</span></div>
+<div class="grid">
+  <div class="pc"><div class="ph" style="background:linear-gradient(135deg,var(--rose-300),var(--rose-500))"><i data-lucide="milk"></i></div><div class="bd"><div class="nm">Maziwa Fresh 500ml</div><div class="pr">KES 60</div><div class="st">42 in stock</div></div></div>
+  <div class="pc"><div class="ph" style="background:linear-gradient(135deg,var(--apricot-300),var(--apricot-500))"><i data-lucide="wheat"></i></div><div class="bd"><div class="nm">Unga Pembe 2kg</div><div class="pr">KES 175</div><div class="st">18 in stock</div></div></div>
+  <div class="pc"><div class="ph" style="background:linear-gradient(135deg,var(--peri-300),var(--peri-500))"><i data-lucide="cup-soda"></i></div><div class="bd"><div class="nm">Soda 500ml</div><div class="pr">KES 70</div><div class="st">Low · 6 left</div></div></div>
+  <div class="pc"><div class="ph" style="background:linear-gradient(135deg,var(--lilac-300),var(--lilac-500))"><i data-lucide="cookie"></i></div><div class="bd"><div class="nm">Biskut Pack</div><div class="pr">KES 45</div><div class="st">90 in stock</div></div></div>
+</div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script>
+</body></html>

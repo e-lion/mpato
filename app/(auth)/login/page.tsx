@@ -1,0 +1,80 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { GoogleButton } from "@/components/auth/GoogleButton";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const next = params.get("next") || "/dashboard";
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.replace(next);
+    router.refresh();
+  }
+
+  return (
+    <div className="auth-card">
+      <div className="brand">
+        <img src="/logomark.svg" alt="Mpato" />
+        <span className="wm">Mpato</span>
+      </div>
+      <h1>Welcome back</h1>
+      <p className="lede">Log in to your shop.</p>
+
+      <GoogleButton next={next} label="Continue with Google" />
+      <div className="auth-divider">or with email</div>
+
+      {error && <div className="auth-error">{error}</div>}
+
+      <form onSubmit={onSubmit}>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <button className="btn btn-primary btn-block" disabled={loading} type="submit">
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+
+      <div className="auth-foot">
+        New to Mpato? <Link href="/signup">Start free</Link>
+      </div>
+    </div>
+  );
+}

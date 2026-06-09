@@ -1,0 +1,165 @@
+/* ============================================================
+   Mpato Design System — colors_and_type.css
+   Business management + POS platform for Kenyan SMEs.
+   Modern, pastel-forward, warm. Raspberry-rose primary.
+   Load fonts before this file:
+   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+   ============================================================ */
+
+:root {
+  /* ---------- Brand: Mpato Rose (warm raspberry — energy, optimism) ---------- */
+  --rose-50:  #FFEEF4;
+  --rose-100: #FFD4E4;
+  --rose-200: #FBACC9;
+  --rose-300: #F47CA8;
+  --rose-400: #EC5189;
+  --rose-500: #E12E6F; /* brand mark — vibrant raspberry */
+  --rose-600: #C21D5B;
+  --rose-700: #9E1549; /* deep rose — text/links on light */
+  --rose-800: #7C1039;
+  --rose-900: #560A27;
+
+  /* ---------- Accent: Apricot (warmth, Kenyan sun, energy) ---------- */
+  --apricot-50:  #FFF2EB;
+  --apricot-100: #FFDFCE;
+  --apricot-200: #FFC4A6;
+  --apricot-300: #FFA47C;
+  --apricot-400: #FB8254;
+  --apricot-500: #F2683C;
+  --apricot-600: #D9501F;
+  --apricot-700: #B23F18;
+
+  /* ---------- Accent: Periwinkle (data viz, info, "new") ---------- */
+  --peri-50:  #EEF0FE;
+  --peri-100: #DEE2FC;
+  --peri-200: #C2C9F8;
+  --peri-300: #9DA8F2;
+  --peri-400: #7C8AEC;
+  --peri-500: #5E6CE0;
+  --peri-600: #4954C9;
+  --peri-700: #3A43A3;
+
+  /* ---------- Accent: Lilac (charts, soft surfaces) ---------- */
+  --lilac-100: #F2EAFB;
+  --lilac-300: #D4BCF0;
+  --lilac-500: #A877E0;
+
+  /* ---------- Neutrals: warm "Stone" (nothing too dark) ---------- */
+  --white: #FFFFFF;
+  --stone-50:  #F8F7F4;
+  --stone-100: #F1EFEA;
+  --stone-200: #E6E2D9;
+  --stone-300: #D5CFC3;
+  --stone-400: #B0A99B;
+  --stone-500: #837C6E;
+  --stone-600: #5F594E;
+  --stone-700: #494438;
+  --stone-800: #2C2922;
+  --stone-900: #211E18;
+
+  /* ---------- Semantic ---------- */
+  --success:  #0F9061;  --success-bg: #E9F8F0;  --success-fg: #0C744F;
+  --warning:  #E2A019;  --warning-bg: #FDF3DC;  --warning-fg: #97650A;
+  --danger:   #E5544B;  --danger-bg:  #FDECEA;  --danger-fg:  #B83A33;
+  --info:     #5E6CE0;  --info-bg:    #EEF0FE;  --info-fg:    #3A43A3;
+
+  /* M-PESA / payment tint (Kenya) */
+  --mpesa: #18A558;  --mpesa-bg: #E7F7EF;
+  --cash:  #837C6E;  --cash-bg:  #F1EFEA;
+
+  /* ---------- Foreground / background roles ---------- */
+  --fg1: var(--stone-900);   /* primary text */
+  --fg2: var(--stone-600);   /* secondary text */
+  --fg3: var(--stone-500);   /* tertiary / captions */
+  --fg-disabled: var(--stone-400);
+  --fg-on-brand: var(--white);
+
+  --bg1: var(--white);       /* surfaces / cards */
+  --bg2: var(--stone-50);    /* app canvas (warm off-white) */
+  --bg3: var(--stone-100);   /* subtle fills */
+  --border: var(--stone-200);
+  --border-strong: var(--stone-300);
+
+  --brand: var(--rose-500);
+  --brand-hover: var(--rose-600);
+  --brand-press: var(--rose-700);
+  --brand-fg: var(--white);          /* text on rose */
+  --brand-text: var(--rose-700);     /* rose for links / ghost / borders */
+  --brand-soft: var(--rose-50);
+
+  /* ---------- Typography ---------- */
+  --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-sans: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+  --fw-extra:   800;
+
+  /* type scale (px) */
+  --fs-display: 52px;  --lh-display: 58px;
+  --fs-h1: 38px;       --lh-h1: 46px;
+  --fs-h2: 28px;       --lh-h2: 36px;
+  --fs-h3: 22px;       --lh-h3: 30px;
+  --fs-h4: 18px;       --lh-h4: 26px;
+  --fs-body-lg: 18px;  --lh-body-lg: 28px;
+  --fs-body: 16px;     --lh-body: 24px;
+  --fs-sm: 14px;       --lh-sm: 20px;
+  --fs-caption: 13px;  --lh-caption: 18px;
+  --fs-micro: 12px;    --lh-micro: 16px;
+
+  /* ---------- Radii (modern, friendly — moderate rounding) ---------- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-2xl: 24px;
+  --r-pill: 999px;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px;
+
+  /* ---------- Elevation (soft, warm-tinted) ---------- */
+  --shadow-xs: 0 1px 2px rgba(33,30,24,.05);
+  --shadow-sm: 0 1px 3px rgba(33,30,24,.07), 0 1px 2px rgba(33,30,24,.04);
+  --shadow-md: 0 6px 18px rgba(33,30,24,.08);
+  --shadow-lg: 0 16px 36px rgba(33,30,24,.10);
+  --shadow-xl: 0 28px 60px rgba(33,30,24,.13);
+  --ring: 0 0 0 4px rgba(225,46,111,.22); /* rose focus ring */
+
+  --transition: 160ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ============================================================
+   Semantic type classes
+   ============================================================ */
+.ds-display { font-family: var(--font-display); font-weight: var(--fw-extra);
+  font-size: var(--fs-display); line-height: var(--lh-display); letter-spacing: -1.4px; color: var(--fg1); }
+.ds-h1 { font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: var(--fs-h1); line-height: var(--lh-h1); letter-spacing: -.8px; color: var(--fg1); }
+.ds-h2 { font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: var(--fs-h2); line-height: var(--lh-h2); letter-spacing: -.5px; color: var(--fg1); }
+.ds-h3 { font-family: var(--font-display); font-weight: var(--fw-semibold);
+  font-size: var(--fs-h3); line-height: var(--lh-h3); letter-spacing: -.3px; color: var(--fg1); }
+.ds-h4 { font-family: var(--font-sans); font-weight: var(--fw-semibold);
+  font-size: var(--fs-h4); line-height: var(--lh-h4); letter-spacing: -.1px; color: var(--fg1); }
+.ds-body-lg { font-family: var(--font-sans); font-weight: var(--fw-regular);
+  font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); color: var(--fg2); }
+.ds-body { font-family: var(--font-sans); font-weight: var(--fw-regular);
+  font-size: var(--fs-body); line-height: var(--lh-body); color: var(--fg2); }
+.ds-sm { font-family: var(--font-sans); font-weight: var(--fw-regular);
+  font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--fg2); }
+.ds-caption { font-family: var(--font-sans); font-weight: var(--fw-medium);
+  font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--fg3); }
+.ds-overline { font-family: var(--font-sans); font-weight: var(--fw-bold);
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: 1px;
+  text-transform: uppercase; color: var(--fg3); }
+.ds-mono { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--fg1);
+  font-variant-numeric: tabular-nums; }
+.ds-num { font-family: var(--font-sans); font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold); letter-spacing: -.2px; }

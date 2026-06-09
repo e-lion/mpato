@@ -1,0 +1,13 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>.scale{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;}.sw{height:60px;border-radius:var(--r-md);border:1px solid rgba(33,30,24,.06);}.scale .lab{margin-top:6px;}.num{font-family:var(--font-mono);font-size:10px;color:var(--fg3);}</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--stone-500)"></span><span class="ttl">Neutrals · Warm Stone</span></div>
+<div class="scale" id="s"></div>
+<script>
+const steps=[['50','#F8F7F4'],['100','#F1EFEA'],['200','#E6E2D9'],['300','#D5CFC3'],['400','#B0A99B'],['500','#837C6E'],['600','#5F594E'],['700','#494438'],['800','#2C2922'],['900','#211E18']];
+document.getElementById('s').innerHTML=steps.map(([k,v])=>`<div><div class="sw" style="background:${v}"></div><div class="lab">${k}</div><div class="num">${v}</div></div>`).join('');
+</script>
+</body></html>

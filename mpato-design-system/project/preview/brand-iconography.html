@@ -1,0 +1,21 @@
+<!-- @dsCard group="Brand" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.icons{display:grid;grid-template-columns:repeat(11,1fr);gap:8px;}
+.ic{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.ic .box{width:100%;aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--r-md);color:var(--fg1);background:var(--stone-50);}
+.ic svg{width:20px;height:20px;stroke-width:2;}
+.ic span{font-size:9px;color:var(--fg3);font-weight:500;}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--stone-700)"></span><span class="ttl">Iconography — Lucide · 2px stroke</span></div>
+<div class="icons" id="g"></div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+const names=['layout-dashboard','shopping-cart','package','users','store','bar-chart-3','smartphone','banknote','receipt','wallet','tag','truck','bell','settings','search','plus','trending-up','calendar','map-pin','sparkles','user-round','box'];
+document.getElementById('g').innerHTML=names.map(n=>`<div class="ic"><div class="box"><i data-lucide="${n}"></i></div><span>${n}</span></div>`).join('');
+lucide.createIcons();
+</script>
+</body></html>

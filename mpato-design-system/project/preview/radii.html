@@ -1,0 +1,13 @@
+<!-- @dsCard group="Spacing" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>.scale{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;}.r{display:flex;flex-direction:column;align-items:center;gap:7px;}.box{width:70px;height:70px;background:var(--rose-50);border:1.5px solid var(--rose-300);}.nm{font-size:12px;font-weight:700;}.num{font-family:var(--font-mono);font-size:10px;color:var(--fg3);}</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--rose-400)"></span><span class="ttl">Corner radii</span></div>
+<div class="scale" id="s"></div>
+<script>
+const r=[['xs','6'],['sm','8'],['md','10'],['lg','14'],['xl','18'],['2xl','24'],['pill','999']];
+document.getElementById('s').innerHTML=r.map(([k,v])=>`<div class="r"><div class="box" style="border-radius:${v=='999'?'999px':v+'px'}"></div><div class="nm">${k}</div><div class="num">${v=='999'?'pill':v+'px'}</div></div>`).join('');
+</script>
+</body></html>

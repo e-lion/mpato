@@ -1,0 +1,13 @@
+<!-- @dsCard group="Spacing" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>.scale{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;}.r{display:flex;flex-direction:column;align-items:center;gap:7px;}.bar{background:var(--apricot-300);border-radius:3px;width:26px;}.nm{font-size:11px;font-weight:700;}.num{font-family:var(--font-mono);font-size:10px;color:var(--fg3);}</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--apricot-400)"></span><span class="ttl">Spacing — 4px base grid</span></div>
+<div class="scale" id="s"></div>
+<script>
+const r=[['1','4'],['2','8'],['3','12'],['4','16'],['5','20'],['6','24'],['8','32'],['10','40'],['12','48'],['16','64']];
+document.getElementById('s').innerHTML=r.map(([k,v])=>`<div class="r"><div class="bar" style="height:${v}px"></div><div class="nm">sp-${k}</div><div class="num">${v}</div></div>`).join('');
+</script>
+</body></html>

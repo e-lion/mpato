@@ -1,0 +1,16 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>.scale{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;}.sw{height:48px;border-radius:var(--r-md);border:1px solid rgba(33,30,24,.06);}.scale .lab{margin-top:5px;}.num{font-family:var(--font-mono);font-size:10px;color:var(--fg3);}.grp{margin-bottom:16px;}.gl{font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;}</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--apricot-500)"></span><span class="ttl">Accents · Apricot &amp; Periwinkle</span></div>
+<div class="grp"><div class="gl">Apricot — warmth, energy, secondary CTAs</div><div class="scale" id="a"></div></div>
+<div class="grp"><div class="gl">Periwinkle — data viz, info, "new"</div><div class="scale" id="p"></div></div>
+<script>
+const ap=[['50','#FFF2EB'],['100','#FFDFCE'],['200','#FFC4A6'],['300','#FFA47C'],['400','#FB8254'],['500','#F2683C'],['600','#D9501F'],['700','#B23F18']];
+const pe=[['50','#EEF0FE'],['100','#DEE2FC'],['200','#C2C9F8'],['300','#9DA8F2'],['400','#7C8AEC'],['500','#5E6CE0'],['600','#4954C9'],['700','#3A43A3']];
+const r=(s)=>s.map(([k,v])=>`<div><div class="sw" style="background:${v}"></div><div class="lab">${k}</div><div class="num">${v}</div></div>`).join('');
+document.getElementById('a').innerHTML=r(ap);document.getElementById('p').innerHTML=r(pe);
+</script>
+</body></html>

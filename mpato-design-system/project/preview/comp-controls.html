@@ -1,0 +1,39 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_card.css">
+<style>
+.row2{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap;}
+.ctl{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--fg1);font-weight:500;}
+.col{display:flex;flex-direction:column;gap:14px;}
+.tog{width:44px;height:26px;border-radius:var(--r-pill);background:var(--rose-500);position:relative;}
+.tog.off{background:var(--stone-300);}
+.tog i{position:absolute;top:3px;left:21px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:var(--shadow-sm);}
+.tog.off i{left:3px;}
+.chk{width:20px;height:20px;border-radius:6px;background:var(--rose-500);display:grid;place-items:center;}
+.chk svg{width:13px;height:13px;color:#fff;}
+.chk.empty{background:#fff;border:1.5px solid var(--border-strong);}
+.rad{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--rose-500);display:grid;place-items:center;}
+.rad i{width:10px;height:10px;border-radius:50%;background:var(--rose-500);}
+.seg{display:inline-flex;background:var(--stone-100);border-radius:var(--r-md);padding:3px;gap:2px;}
+.seg button{border:none;background:transparent;font-family:var(--font-sans);font-weight:600;font-size:13px;padding:7px 14px;border-radius:var(--r-sm);color:var(--fg2);cursor:pointer;}
+.seg button.on{background:#fff;color:var(--fg1);box-shadow:var(--shadow-sm);}
+</style>
+</head><body>
+<div class="cardhead"><span class="dot" style="background:var(--rose-500)"></span><span class="ttl">Toggles, checks &amp; segments</span></div>
+<div class="row2">
+  <div class="col">
+    <div class="ctl"><span class="tog"><i></i></span>Accept M-PESA</div>
+    <div class="ctl"><span class="tog off"><i></i></span>Print receipt</div>
+  </div>
+  <div class="col">
+    <div class="ctl"><span class="chk"><i data-lucide="check"></i></span>In stock</div>
+    <div class="ctl"><span class="chk empty"></span>Featured</div>
+    <div class="ctl"><span class="rad"><i></i></span>Per item</div>
+  </div>
+  <div class="col">
+    <div class="seg"><button class="on">Day</button><button>Week</button><button>Month</button></div>
+  </div>
+</div>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script>
+</body></html>
