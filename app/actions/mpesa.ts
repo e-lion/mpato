@@ -58,6 +58,11 @@ export async function initiateStkPush(amount: number, phone: string) {
       .slice(0, -3);
     const password = Buffer.from(`${env.shortcode}${env.passkey}${timestamp}`).toString("base64");
 
+    // Get the site URL for the webhook callback
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 
+                    "https://mpato.com");
+
     const payload = {
       BusinessShortCode: env.shortcode,
       Password: password,
@@ -67,7 +72,7 @@ export async function initiateStkPush(amount: number, phone: string) {
       PartyA: formattedPhone,
       PartyB: env.shortcode,
       PhoneNumber: formattedPhone,
-      CallBackURL: "https://mpato.com/api/mpesa/callback", // Dummy or actual callback
+      CallBackURL: `${siteUrl}/api/mpesa/callback`,
       AccountReference: "Mpato POS",
       TransactionDesc: "POS Payment",
     };
@@ -95,8 +100,43 @@ export async function initiateStkPush(amount: number, phone: string) {
   }
 }
 
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
 export async function checkStkPushStatus(checkoutRequestId: string) {
   try {
+    // 1. Check if the webhook already saved the receipt in Supabase
+    const cookieStore = await cookies();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignore in Server Actions
+          }
+        },
+      },
+    });
+
+    const { data: cbData } = await supabase
+      .from("mpato_stk_callbacks")
+      .select("receipt_number")
+      .eq("checkout_request_id", checkoutRequestId)
+      .maybeSingle();
+
+    if (cbData?.receipt_number) {
+      return { status: "success", receipt: cbData.receipt_number };
+    }
+
+    // 2. If not in DB yet, check Daraja for failures/cancellations
     const env = getEnv();
     const token = await getAccessToken();
     const timestamp = new Date()
@@ -129,8 +169,9 @@ export async function checkStkPushStatus(checkoutRequestId: string) {
     }
 
     if (data.ResultCode === "0") {
-      // Success. We use a mock M-PESA receipt ID or the checkout request ID
-      return { status: "success", receipt: "STK" + checkoutRequestId.slice(-8).toUpperCase() };
+      // Daraja says success, but webhook hasn't saved to DB yet!
+      // We keep it pending so the UI keeps polling until the webhook saves the exact receipt number.
+      return { status: "pending" };
     } else if (data.ResultCode) {
       // A specific ResultCode indicates failure/cancellation
       return { status: "failed", error: data.ResultDesc || "Transaction failed" };
