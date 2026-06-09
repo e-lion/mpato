@@ -29,7 +29,7 @@ export async function saveMessage(
     phone_number: phoneNumber,
     direction,
     content,
-  });
+  } as any);
 
   if (error) {
     console.error("Failed to save message:", error);
@@ -46,7 +46,7 @@ export async function getChatHistory(storeId: string, phoneNumber: string) {
     .select("*")
     .eq("store_id", storeId)
     .eq("phone_number", phoneNumber)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }) as any;
 
   if (error) {
     console.error("Failed to get chat history:", error);
