@@ -12,21 +12,29 @@ export async function saveMessage(
   
   // Try to find if this phone number belongs to an existing customer
   let customerId = null;
+  let finalPhone = phoneNumber;
+  
+  const possiblePhones = [phoneNumber];
+  if (phoneNumber.startsWith("254")) possiblePhones.push("0" + phoneNumber.substring(3));
+  if (phoneNumber.startsWith("0")) possiblePhones.push("254" + phoneNumber.substring(1));
+
   const { data: customerData } = await supabase
     .from("mpato_customers")
-    .select("id")
+    .select("id, phone")
     .eq("store_id", storeId)
-    .eq("phone", phoneNumber)
+    .in("phone", possiblePhones)
+    .limit(1)
     .maybeSingle();
 
   if (customerData) {
     customerId = (customerData as any).id;
+    finalPhone = (customerData as any).phone;
   }
 
   const { error } = await supabase.from("mpato_whatsapp_messages").insert({
     store_id: storeId,
     customer_id: customerId,
-    phone_number: phoneNumber,
+    phone_number: finalPhone,
     direction,
     content,
   } as any);
@@ -41,11 +49,15 @@ export async function saveMessage(
 
 export async function getChatHistory(storeId: string, phoneNumber: string) {
   const supabase = await createSupabaseServerClient();
+  const possiblePhones = [phoneNumber];
+  if (phoneNumber.startsWith("254")) possiblePhones.push("0" + phoneNumber.substring(3));
+  if (phoneNumber.startsWith("0")) possiblePhones.push("254" + phoneNumber.substring(1));
+
   const { data, error } = await supabase
     .from("mpato_whatsapp_messages")
     .select("*")
     .eq("store_id", storeId)
-    .eq("phone_number", phoneNumber)
+    .in("phone_number", possiblePhones)
     .order("created_at", { ascending: true }) as any;
 
   if (error) {
