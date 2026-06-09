@@ -5,7 +5,7 @@ import { Btn } from "./primitives";
 import { Modal } from "./Modal";
 import { TILES } from "@/lib/mockData";
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from "@/app/actions/products";
-import type { Product } from "@/lib/data/types";
+import { CATEGORIES, type Product } from "@/lib/data/types";
 
 const GLYPHS = [
   "package", "milk", "wheat", "cup-soda", "cookie", "candy",
@@ -39,7 +39,7 @@ export function ProductForm({
         glyph: mode.product.glyph,
         tile: mode.product.tile,
       }
-    : { name: "", category: "Groceries", price: 0, stock: 0, glyph: "package", tile: "apricot" };
+    : { name: "", category: "Beverages", price: 0, stock: 0, glyph: "package", tile: "apricot" };
 
   const [form, setForm] = useState<ProductInput>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -96,13 +96,18 @@ export function ProductForm({
         <div className="m-grid-2">
           <div className="m-field">
             <label htmlFor="p-cat">Category</label>
-            <input
+            <select
               id="p-cat"
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              placeholder="Groceries"
               required
-            />
+            >
+              {CATEGORIES.filter((c) => c !== "All").map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="m-field">
             <label htmlFor="p-stock">Stock</label>
