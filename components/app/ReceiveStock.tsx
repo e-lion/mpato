@@ -49,6 +49,9 @@ export function ReceiveStock({
   const [deliveryDate, setDeliveryDate] = useState(todayISO());
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [amountPaid, setAmountPaid] = useState<number | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "mpesa">("mpesa");
+  const [paymentRef, setPaymentRef] = useState("");
   const [lines, setLines] = useState<Line[]>([
     { rowKey: crypto.randomUUID(), productId: "", qty: 1, unitCost: 0 },
   ]);
@@ -97,6 +100,9 @@ export function ReceiveStock({
     setDeliveryDate(todayISO());
     setReference("");
     setNotes("");
+    setAmountPaid("");
+    setPaymentMethod("mpesa");
+    setPaymentRef("");
     setLines([{ rowKey: crypto.randomUUID(), productId: "", qty: 1, unitCost: 0 }]);
     setError(null);
     setSuccess(null);
@@ -126,6 +132,9 @@ export function ReceiveStock({
         deliveryDate,
         notes,
         items,
+        amountPaid: Number(amountPaid) || 0,
+        paymentMethod,
+        paymentReference: paymentRef,
       });
       if (!result.ok) {
         setError(result.error);
@@ -486,6 +495,55 @@ export function ReceiveStock({
               placeholder="Anything to remember about this delivery (damaged crates, partial delivery…)"
               style={{ resize: "vertical", minHeight: 60 }}
             />
+          </div>
+
+          {/* Initial Payment Section */}
+          <div style={{ background: "var(--bg1)", padding: 16, borderRadius: "var(--r-md)", border: "1px solid var(--border)" }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700 }}>Initial Payment</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+              <div className="m-field" style={{ marginBottom: 0 }}>
+                <label htmlFor="rs-amount">Amount paid</label>
+                <input
+                  id="rs-amount"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value ? Number(e.target.value) : "")}
+                  className="num"
+                />
+              </div>
+              <div className="m-field" style={{ marginBottom: 0 }}>
+                <label htmlFor="rs-method">Method</label>
+                <select
+                  id="rs-method"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as "cash" | "mpesa")}
+                  disabled={!amountPaid || amountPaid === 0}
+                >
+                  <option value="mpesa">M-PESA</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+              {paymentMethod === "mpesa" && (
+                <div className="m-field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="rs-pay-ref">M-PESA Code</label>
+                  <input
+                    id="rs-pay-ref"
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value.toUpperCase())}
+                    placeholder="e.g. QFE..."
+                    disabled={!amountPaid || amountPaid === 0}
+                  />
+                </div>
+              )}
+            </div>
+            {Number(amountPaid) > 0 && Number(amountPaid) < total && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "var(--amber-700)", fontWeight: 600 }}>
+                Balance remaining: {KES(Math.round(total - Number(amountPaid)))}
+              </div>
+            )}
           </div>
 
           {error && <div className="m-error">{error}</div>}

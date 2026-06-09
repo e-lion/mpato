@@ -9,6 +9,9 @@ export type ReceiveStockInput = {
   deliveryDate: string; // YYYY-MM-DD
   notes: string;
   items: { productId: string; qty: number; unitCost: number }[]; // unitCost in shillings
+  amountPaid: number; // initial payment in shillings
+  paymentMethod: "cash" | "mpesa";
+  paymentReference?: string;
 };
 
 export type ReceiveStockResult =
@@ -79,6 +82,15 @@ export async function receiveStock(
   revalidatePath("/inventory/receipts");
   revalidatePath("/dashboard");
 
+  if (input.amountPaid > 0) {
+    await recordSupplierPayment({
+      receiptId: row.out_receipt_id,
+      amountCents: Math.round(input.amountPaid * 100),
+      method: input.paymentMethod,
+      reference: input.paymentReference || "",
+    });
+  }
+
   return {
     ok: true,
     receiptId: row.out_receipt_id,
@@ -86,4 +98,55 @@ export async function receiveStock(
     totalCents: row.out_total_cents,
     lineCount: row.out_line_count,
   };
+}
+
+export async function recordSupplierPayment(
+  input: {
+    receiptId: string;
+    amountCents: number;
+    method: "cash" | "mpesa";
+    reference: string;
+  }
+) {
+  const storeId = await getCurrentStoreId();
+  if (!storeId) return { ok: false, error: "No active store" };
+
+  const supabase = await createSupabaseServerClient();
+  
+  const { data: receipt, error: rErr } = await supabase
+    .from("mpato_stock_receipts")
+    .select("total_cost_cents, amount_paid_cents, supplier_id")
+    .eq("id", input.receiptId)
+    .eq("store_id", storeId)
+    .single();
+
+  if (rErr || !receipt) return { ok: false, error: "Receipt not found" };
+  if (!receipt.supplier_id) return { ok: false, error: "Cannot log payment for a receipt without a supplier" };
+
+  const { error: pErr } = await supabase
+    .from("mpato_supplier_payments")
+    .insert({
+      store_id: storeId,
+      receipt_id: input.receiptId,
+      supplier_id: receipt.supplier_id,
+      amount_cents: input.amountCents,
+      method: input.method,
+      reference: input.reference,
+    });
+
+  if (pErr) return { ok: false, error: pErr.message };
+
+  const newAmountPaid = Number(receipt.amount_paid_cents) + input.amountCents;
+  const newStatus = newAmountPaid >= Number(receipt.total_cost_cents) ? "paid" : (newAmountPaid > 0 ? "partial" : "unpaid");
+
+  await supabase
+    .from("mpato_stock_receipts")
+    .update({
+      amount_paid_cents: newAmountPaid,
+      payment_status: newStatus,
+    })
+    .eq("id", input.receiptId);
+
+  revalidatePath("/inventory/receipts");
+  return { ok: true };
 }

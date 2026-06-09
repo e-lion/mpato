@@ -249,12 +249,23 @@ export type StockReceiptListItem = {
   createdAt: string;
   supplierName: string | null;
   totalCostCents: number;
+  amountPaidCents: number;
+  paymentStatus: "unpaid" | "partial" | "paid";
   lineCount: number;
+};
+
+export type SupplierPayment = {
+  id: string;
+  amountCents: number;
+  method: "cash" | "mpesa";
+  reference: string | null;
+  createdAt: string;
 };
 
 export type StockReceiptDetail = StockReceiptListItem & {
   notes: string | null;
   lines: StockReceiptLine[];
+  payments: SupplierPayment[];
 };
 
 export async function getStockReceipts(
@@ -265,7 +276,7 @@ export async function getStockReceipts(
   const { data, error } = await supabase
     .from("mpato_stock_receipts")
     .select(
-      `id, receipt_no, reference, delivery_date, created_at, total_cost_cents,
+      `id, receipt_no, reference, delivery_date, created_at, total_cost_cents, amount_paid_cents, payment_status,
        mpato_suppliers ( name ),
        mpato_stock_receipt_items ( id )`,
     )
@@ -285,6 +296,8 @@ export async function getStockReceipts(
         ? ((r.mpato_suppliers as Row).name as string | null) ?? null
         : null,
     totalCostCents: Number(r.total_cost_cents) || 0,
+    amountPaidCents: Number(r.amount_paid_cents) || 0,
+    paymentStatus: (r.payment_status as "unpaid" | "partial" | "paid") || "unpaid",
     lineCount: Array.isArray(r.mpato_stock_receipt_items)
       ? (r.mpato_stock_receipt_items as Row[]).length
       : 0,
@@ -299,9 +312,10 @@ export async function getStockReceipt(
   const { data, error } = await supabase
     .from("mpato_stock_receipts")
     .select(
-      `id, receipt_no, reference, delivery_date, created_at, notes, total_cost_cents,
+      `id, receipt_no, reference, delivery_date, created_at, notes, total_cost_cents, amount_paid_cents, payment_status,
        mpato_suppliers ( name ),
-       mpato_stock_receipt_items ( id, product_id, product_name_snapshot, qty, unit_cost_cents )`,
+       mpato_stock_receipt_items ( id, product_id, product_name_snapshot, qty, unit_cost_cents ),
+       mpato_supplier_payments ( id, amount_cents, method, reference, created_at )`,
     )
     .eq("store_id", storeId)
     .eq("id", receiptId)
@@ -324,6 +338,8 @@ export async function getStockReceipt(
         ? ((r.mpato_suppliers as Row).name as string | null) ?? null
         : null,
     totalCostCents: Number(r.total_cost_cents) || 0,
+    amountPaidCents: Number(r.amount_paid_cents) || 0,
+    paymentStatus: (r.payment_status as "unpaid" | "partial" | "paid") || "unpaid",
     lineCount: items.length,
     lines: items.map((it) => ({
       id: it.id as string,
@@ -332,6 +348,15 @@ export async function getStockReceipt(
       qty: Number(it.qty) || 0,
       unitCostCents: Number(it.unit_cost_cents) || 0,
     })),
+    payments: Array.isArray(r.mpato_supplier_payments)
+      ? (r.mpato_supplier_payments as Row[]).map((p) => ({
+          id: p.id as string,
+          amountCents: Number(p.amount_cents) || 0,
+          method: p.method as "cash" | "mpesa",
+          reference: (p.reference as string | null) ?? null,
+          createdAt: p.created_at as string,
+        })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      : [],
   };
 }
 

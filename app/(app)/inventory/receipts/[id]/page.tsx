@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/app/Icon";
 import { KES } from "@/lib/format";
 import { getCurrentStoreId, getStockReceipt } from "@/lib/data/queries";
+import { ReceiptPaymentSection } from "@/components/app/ReceiptPaymentSection";
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("en-KE", {
@@ -163,6 +164,50 @@ export default async function StockReceiptDetailPage({
             </tbody>
           </table>
         </div>
+
+        <ReceiptPaymentSection
+          receiptId={receipt.id}
+          totalCost={receipt.totalCostCents}
+          amountPaid={receipt.amountPaidCents}
+          status={receipt.paymentStatus}
+        />
+
+        {receipt.payments.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <h3
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: 16,
+                margin: "0 0 10px",
+              }}
+            >
+              Payment History
+            </h3>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Method</th>
+                  <th>Reference</th>
+                  <th style={{ textAlign: "right" }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receipt.payments.map((p) => (
+                  <tr key={p.id}>
+                    <td>{fmtDateTime(p.createdAt)}</td>
+                    <td style={{ textTransform: "capitalize" }}>{p.method}</td>
+                    <td className="mono">{p.reference || "—"}</td>
+                    <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>
+                      {KES(Math.round(p.amountCents / 100))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {receipt.notes && (
           <div

@@ -96,8 +96,10 @@ export function StockReceiptList({ receipts }: { receipts: StockReceiptListItem[
                 <th>Supplier</th>
                 <th>Reference</th>
                 <th>Delivered</th>
-                <th style={{ textAlign: "right" }}>Items</th>
                 <th style={{ textAlign: "right" }}>Cost</th>
+                <th style={{ textAlign: "right" }}>Paid</th>
+                <th style={{ textAlign: "right" }}>Balance</th>
+                <th style={{ textAlign: "center" }}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -117,9 +119,41 @@ export function StockReceiptList({ receipts }: { receipts: StockReceiptListItem[
                   </td>
                   <td style={{ color: "var(--fg2)" }}>{r.reference ?? "—"}</td>
                   <td style={{ color: "var(--fg2)" }}>{fmtDate(r.deliveryDate)}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{r.lineCount}</td>
                   <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>
                     {KES(Math.round(r.totalCostCents / 100))}
+                  </td>
+                  <td className="num" style={{ textAlign: "right", color: "var(--fg2)" }}>
+                    {KES(Math.round(r.amountPaidCents / 100))}
+                  </td>
+                  <td className="num" style={{ textAlign: "right", color: "var(--fg2)" }}>
+                    {KES(Math.round((r.totalCostCents - r.amountPaidCents) / 100))}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 8px",
+                        borderRadius: 12,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: ".5px",
+                        background:
+                          r.paymentStatus === "paid"
+                            ? "var(--emerald-100)"
+                            : r.paymentStatus === "partial"
+                              ? "var(--amber-100)"
+                              : "var(--rose-100)",
+                        color:
+                          r.paymentStatus === "paid"
+                            ? "var(--emerald-800)"
+                            : r.paymentStatus === "partial"
+                              ? "var(--amber-800)"
+                              : "var(--rose-800)",
+                      }}
+                    >
+                      {r.paymentStatus}
+                    </div>
                   </td>
                 </tr>
               ))}
