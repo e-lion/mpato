@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(req: Request) {
   try {
     const data = await req.json();
+    console.log("M-PESA Webhook received:", JSON.stringify(data, null, 2));
     const stkCallback = data?.Body?.stkCallback;
     
     if (stkCallback) {
