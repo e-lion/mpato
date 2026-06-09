@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { Badge, Btn } from "./primitives";
@@ -20,6 +20,15 @@ export function Inventory({ products }: { products: Product[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [form, setForm] = useState<FormState>({ kind: "closed" });
+  const [isPendingNav, startTransitionNav] = useTransition();
+  const [navTarget, setNavTarget] = useState<string | null>(null);
+
+  const navigate = (path: string) => {
+    setNavTarget(path);
+    startTransitionNav(() => {
+      router.push(path);
+    });
+  };
 
   const list = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
   const totalValue = products.reduce((s, p) => s + p.price * p.stock, 0);
@@ -64,16 +73,18 @@ export function Inventory({ products }: { products: Product[] }) {
             <Btn
               variant="secondary"
               icon="receipt"
-              onClick={() => router.push("/inventory/receipts")}
+              disabled={isPendingNav && navTarget === "/inventory/receipts"}
+              onClick={() => navigate("/inventory/receipts")}
             >
-              Stock receipts
+              {isPendingNav && navTarget === "/inventory/receipts" ? "Loading…" : "Stock receipts"}
             </Btn>
             <Btn
               variant="secondary"
               icon="truck"
-              onClick={() => router.push("/inventory/receive")}
+              disabled={isPendingNav && navTarget === "/inventory/receive"}
+              onClick={() => navigate("/inventory/receive")}
             >
-              Receive stock
+              {isPendingNav && navTarget === "/inventory/receive" ? "Loading…" : "Receive stock"}
             </Btn>
             <Btn variant="primary" icon="plus" onClick={() => setForm({ kind: "create" })}>
               Add product
