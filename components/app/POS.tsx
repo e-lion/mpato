@@ -820,7 +820,7 @@ export function POS({
               </Btn>
               {selectedCustomer?.phone && (
                 <Btn
-                  variant={wsStatus === "sent" ? "success" : "secondary"}
+                  variant={wsStatus === "sent" ? "primary" : "secondary"}
                   block
                   icon="message-circle"
                   onClick={sendWhatsAppReceipt}
