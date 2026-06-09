@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { io } from "socket.io-client";
 import { Icon } from "./Icon";
 import { Avatar, Badge, Btn } from "./primitives";
 import { KES } from "@/lib/format";
@@ -48,6 +49,7 @@ export function POS({
   const defaultMethod = settings?.defaultPaymentMethod ?? "mpesa";
   const searchParams = useSearchParams();
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [wsStatus, setWsStatus] = useState<"idle" | "connecting" | "sending" | "sent" | "error">("idle");
 
   // Pre-select a customer when the page is opened via "New sale" from a
   // profile (URL like /pos?customer=<id>). Runs once on mount.
@@ -234,6 +236,43 @@ export function POS({
   const choose = (id: string | null) => {
     setCustomerId(id);
     closePicker();
+  };
+
+  const sendWhatsAppReceipt = () => {
+    if (!selectedCustomer?.phone || !settings || !done) return;
+    setWsStatus("connecting");
+    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "http://localhost:4000";
+    const socket = io(workerUrl);
+    const sessionId = settings.id;
+
+    socket.on("connect", () => {
+      setWsStatus("sending");
+      
+      const shopName = settings.name;
+      const linesText = done.lines.map((l) => `${l.name} x${l.qty} = KES ${l.unitPrice * l.qty}`).join("\n");
+      const text = `=====================\n  ${shopName}\n=====================\nReceipt #: ${done.receiptNo}\nDate: ${new Date(done.createdAt).toLocaleString()}\n\nItems:\n${linesText}\n\nTotal: KES ${done.total}\nMethod: ${done.method}\n\nThank you for your business!\n=====================`;
+
+      socket.emit("send_message", { sessionId, to: selectedCustomer.phone, text });
+    });
+
+    socket.on("message_sent", (data) => {
+      if (data.sessionId === sessionId) {
+        if (data.success) {
+          setWsStatus("sent");
+          import("@/app/actions/messages").then(({ saveMessage }) => {
+            saveMessage(sessionId, selectedCustomer.phone!, "outbound", data.text);
+          });
+        } else {
+          setWsStatus("error");
+        }
+        setTimeout(() => socket.disconnect(), 500);
+      }
+    });
+    
+    socket.on("connect_error", () => {
+      setWsStatus("error");
+      socket.disconnect();
+    });
   };
 
   return (
@@ -779,6 +818,17 @@ export function POS({
               >
                 Receipt
               </Btn>
+              {selectedCustomer?.phone && (
+                <Btn
+                  variant={wsStatus === "sent" ? "success" : "secondary"}
+                  block
+                  icon="message-circle"
+                  onClick={sendWhatsAppReceipt}
+                  disabled={wsStatus === "connecting" || wsStatus === "sending" || wsStatus === "sent"}
+                >
+                  {wsStatus === "sent" ? "Sent!" : wsStatus === "error" ? "Failed" : wsStatus !== "idle" ? "Sending..." : "WhatsApp"}
+                </Btn>
+              )}
               <Btn variant="primary" block icon="plus" onClick={reset}>New sale</Btn>
             </div>
           </div>

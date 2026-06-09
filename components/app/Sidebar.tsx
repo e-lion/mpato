@@ -12,6 +12,7 @@ const PRIMARY: NavItem[] = [
   { href: "/pos", label: "Point of sale", icon: "shopping-cart" },
   { href: "/inventory", label: "Inventory", icon: "package" },
   { href: "/customers", label: "Customers", icon: "users" },
+  { href: "/messages", label: "Messages", icon: "message-circle" },
 ];
 
 const MANAGE: NavItem[] = [

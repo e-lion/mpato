@@ -10,6 +10,7 @@ import {
   updateStoreProfile,
 } from "@/app/actions/settings";
 import type { StoreSettings } from "@/lib/data/queries";
+import { WhatsAppIntegration } from "./WhatsAppIntegration";
 
 type Props = {
   user: { email: string | null; fullName: string; initials: string };
@@ -562,6 +563,7 @@ export function Settings({ user, store }: Props) {
       <BusinessProfile store={store} />
       <Payments store={store} />
       <Receipts store={store} />
+      <WhatsAppIntegration storeId={store?.id} />
       <AccountProfile user={user} />
       <SignOutCard />
     </div>
