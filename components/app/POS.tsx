@@ -813,27 +813,29 @@ export function POS({
             <p className="mono" style={{ color: "var(--fg3)", fontSize: 13, margin: "0 0 20px" }}>
               #{done.receiptNo}
             </p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <Btn
-                variant="secondary"
-                block
-                icon="printer"
-                onClick={() => setShowReceipt(true)}
-              >
-                Receipt
-              </Btn>
-              {selectedCustomer?.phone && (
-                <Btn
-                  variant={wsStatus === "sent" ? "primary" : "secondary"}
-                  block
-                  icon="message-circle"
-                  onClick={sendWhatsAppReceipt}
-                  disabled={wsStatus === "connecting" || wsStatus === "sending" || wsStatus === "sent"}
-                >
-                  {wsStatus === "sent" ? "Sent!" : wsStatus === "error" ? "Failed" : wsStatus !== "idle" ? "Sending..." : "WhatsApp"}
-                </Btn>
-              )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Btn variant="primary" block icon="plus" onClick={reset}>New sale</Btn>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn
+                  variant="secondary"
+                  block
+                  icon="printer"
+                  onClick={() => setShowReceipt(true)}
+                >
+                  Receipt
+                </Btn>
+                {selectedCustomer?.phone && (
+                  <Btn
+                    variant={wsStatus === "sent" ? "primary" : "secondary"}
+                    block
+                    icon="message-circle"
+                    onClick={sendWhatsAppReceipt}
+                    disabled={wsStatus === "connecting" || wsStatus === "sending" || wsStatus === "sent"}
+                  >
+                    {wsStatus === "sent" ? "Sent!" : wsStatus === "error" ? "Failed" : wsStatus !== "idle" ? "Sending..." : "WhatsApp"}
+                  </Btn>
+                )}
+              </div>
             </div>
           </div>
         </div>
