@@ -113,17 +113,19 @@ export async function recordSupplierPayment(
 
   const supabase = await createSupabaseServerClient();
   
-  const { data: receipt, error: rErr } = await supabase
+  const { data, error: rErr } = await supabase
     .from("mpato_stock_receipts")
     .select("total_cost_cents, amount_paid_cents, supplier_id")
     .eq("id", input.receiptId)
     .eq("store_id", storeId)
     .single();
 
+  const receipt = data as any;
+
   if (rErr || !receipt) return { ok: false, error: "Receipt not found" };
   if (!receipt.supplier_id) return { ok: false, error: "Cannot log payment for a receipt without a supplier" };
 
-  const { error: pErr } = await supabase
+  const { error: pErr } = await (supabase as any)
     .from("mpato_supplier_payments")
     .insert({
       store_id: storeId,
@@ -139,7 +141,7 @@ export async function recordSupplierPayment(
   const newAmountPaid = Number(receipt.amount_paid_cents) + input.amountCents;
   const newStatus = newAmountPaid >= Number(receipt.total_cost_cents) ? "paid" : (newAmountPaid > 0 ? "partial" : "unpaid");
 
-  await supabase
+  await (supabase as any)
     .from("mpato_stock_receipts")
     .update({
       amount_paid_cents: newAmountPaid,

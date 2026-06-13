@@ -54,7 +54,7 @@ export async function initiateStkPush(amount: number, phone: string) {
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function checkStkPushStatus(checkoutRequestId: string) {
+export async function checkStkPushStatus(checkoutRequestId: string): Promise<{ status: "success", receipt: string } | { status: "pending" } | { status: "failed", error: string }> {
   try {
     // 1. Check if the webhook already saved the receipt in Supabase
     const cookieStore = await cookies();
