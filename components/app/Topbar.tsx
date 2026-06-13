@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { Btn } from "./primitives";
+import { AccountMenu } from "./AccountMenu";
 import type { SessionContext } from "@/lib/data/session";
 
 function greetingForHour(h: number): string {
@@ -102,13 +102,7 @@ export function Topbar({ ctx }: { ctx: SessionContext | null }) {
           New sale
         </Btn>
       )}
-      <Link
-        href="/settings"
-        className="avatar"
-        title={ctx?.user.fullName ?? "Account"}
-      >
-        {ctx?.user.initials ?? "?"}
-      </Link>
+      <AccountMenu ctx={ctx} />
     </header>
   );
 }

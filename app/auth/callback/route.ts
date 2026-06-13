@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { onboardUser, type RpcFn } from "@/lib/auth/onboarding";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -18,7 +19,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(`/login?${params}`, url.origin));
   }
 
-  // Auto-provision a store for first-time users (idempotent via RPC).
+  // First-time users: claim a staff invite if one exists for this email,
+  // otherwise provision a fresh store (the owner path). Idempotent.
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
     const shopName =
@@ -28,16 +30,8 @@ export async function GET(request: Request) {
       "My Shop";
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rpc = (supabase as any).rpc.bind(supabase) as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ error: { message: string } | null }>;
-    const { error: rpcError } = await rpc("mpato_provision_store", {
-      p_shop_name: shopName,
-    });
-    if (rpcError) {
-      console.error("[auth/callback] mpato_provision_store failed:", rpcError);
-    }
+    const rpc = (supabase as any).rpc.bind(supabase) as RpcFn;
+    await onboardUser(rpc, shopName);
   }
 
   return NextResponse.redirect(new URL(next, url.origin));

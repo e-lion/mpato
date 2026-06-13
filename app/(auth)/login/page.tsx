@@ -3,6 +3,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { claimInvite, type RpcFn } from "@/lib/auth/onboarding";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 
 function LoginContent() {
@@ -21,11 +22,15 @@ function LoginContent() {
     setLoading(true);
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    // Attach any pending staff invite for this account (no-op otherwise).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await claimInvite((supabase as any).rpc.bind(supabase) as RpcFn);
+    setLoading(false);
     router.replace(next);
     router.refresh();
   }

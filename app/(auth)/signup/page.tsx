@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { onboardUser, type RpcFn } from "@/lib/auth/onboarding";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 
 export default function SignupPage() {
@@ -33,16 +34,8 @@ export default function SignupPage() {
 
     if (data.user) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rpc = (supabase as any).rpc.bind(supabase) as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ error: { message: string } | null }>;
-      const { error: rpcError } = await rpc("mpato_provision_store", {
-        p_shop_name: shopName || "My Shop",
-      });
-      if (rpcError) {
-        console.error("[signup] mpato_provision_store failed:", rpcError);
-      }
+      const rpc = (supabase as any).rpc.bind(supabase) as RpcFn;
+      await onboardUser(rpc, shopName);
     }
 
     setLoading(false);

@@ -233,6 +233,41 @@ export async function getSuppliers(storeId: string): Promise<Supplier[]> {
   }));
 }
 
+export type StaffRole = "manager" | "cashier";
+
+export type Staff = {
+  id: string;
+  name: string;
+  role: StaffRole;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  /** true once the person has signed up and claimed their invite. */
+  active: boolean;
+  createdAt: string;
+};
+
+export async function getStaff(storeId: string): Promise<Staff[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("mpato_staff")
+    .select("id, name, role, phone, email, notes, user_id, created_at")
+    .eq("store_id", storeId)
+    .order("name", { ascending: true });
+
+  if (error || !data) return [];
+  return (data as Row[]).map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    role: (r.role as string) === "manager" ? "manager" : "cashier",
+    phone: (r.phone as string | null) ?? null,
+    email: (r.email as string | null) ?? null,
+    notes: (r.notes as string | null) ?? null,
+    active: Boolean(r.user_id),
+    createdAt: r.created_at as string,
+  }));
+}
+
 export type StockReceiptLine = {
   id: string;
   productId: string | null;
@@ -372,6 +407,26 @@ export async function getRecentSales(storeId: string, limit = 5): Promise<Recent
     .limit(limit);
 
   if (error || !data) return [];
+
+  // Resolve cashier_id -> display name for everyone in the store (owner + staff)
+  // so each sale is attributed to whoever actually rang it up.
+  const { data: { user } } = await supabase.auth.getUser();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rpc = (supabase as any).rpc.bind(supabase) as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: Row[] | null; error: { message: string } | null }>;
+  const { data: cashierRows } = await rpc("mpato_store_cashiers", { p_store_id: storeId });
+  const nameById = new Map<string, string>(
+    ((cashierRows ?? []) as Row[]).map((c) => [c.user_id as string, c.name as string]),
+  );
+
+  function cashierLabel(cashierId: string | null): string {
+    if (!cashierId) return "—";
+    if (user && cashierId === user.id) return "You";
+    return nameById.get(cashierId) ?? "Cashier";
+  }
+
   return (data as Row[]).map((r) => ({
     id: r.id as string,
     receiptNo: r.receipt_no as string,
@@ -381,7 +436,7 @@ export async function getRecentSales(storeId: string, limit = 5): Promise<Recent
     total: Math.round((r.total_cents as number) / 100),
     method: r.method as "mpesa" | "cash",
     time: relativeTime(r.created_at as string),
-    cashier: "You",
+    cashier: cashierLabel((r.cashier_id as string | null) ?? null),
   }));
 }
 

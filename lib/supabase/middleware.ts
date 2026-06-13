@@ -1,10 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canAccess, isRole, landingFor } from "@/lib/auth/access";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-const PROTECTED = ["/dashboard", "/pos", "/inventory", "/customers", "/suppliers", "/reports", "/storefront", "/staff", "/settings"];
-const AUTH_PAGES = ["/login", "/signup"];
+const PROTECTED = ["/dashboard", "/pos", "/inventory", "/customers", "/messages", "/suppliers", "/reports", "/storefront", "/staff", "/settings"];
+const AUTH_PAGES = ["/login", "/signup", "/join"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,8 +31,9 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
+  const isProtected = PROTECTED.some((p) => path === p || path.startsWith(p + "/"));
 
-  if (!user && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {
+  if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
@@ -42,6 +44,24 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // Role-based guard: keep cashiers/managers out of pages above their role.
+  if (user && isProtected) {
+    const { data: member } = await supabase
+      .from("mpato_store_members")
+      .select("role")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    const role = (member as { role?: string } | null)?.role;
+    if (isRole(role) && !canAccess(role, path)) {
+      const url = request.nextUrl.clone();
+      url.pathname = landingFor(role);
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

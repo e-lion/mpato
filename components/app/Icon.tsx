@@ -1,7 +1,7 @@
 import {
   ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Banknote, BarChart3, Bell, Box,
   Candy, Check, ChevronDown, ChevronsUpDown, Cookie, CupSoda, Download, Droplet, Ellipsis,
-  Filter, Flame, LayoutDashboard, Leaf, Milk, Minus, Package, Pencil, PlayCircle, Plus,
+  Filter, Flame, LayoutDashboard, Leaf, LogOut, Milk, Minus, Package, Pencil, PlayCircle, Plus,
   Printer, Receipt, Sandwich, Search, Send, Settings, ShoppingCart, Smartphone,
   Sparkles, Store, Trash2, TrendingUp, Truck, UserPlus, UserRound, Users, Wheat, X, Zap,
   type LucideIcon,
@@ -29,6 +29,7 @@ const MAP: Record<string, LucideIcon> = {
   flame: Flame,
   "layout-dashboard": LayoutDashboard,
   leaf: Leaf,
+  "log-out": LogOut,
   milk: Milk,
   minus: Minus,
   package: Package,

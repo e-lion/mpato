@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
+import { canAccess, type Role } from "@/lib/auth/access";
 import type { SessionContext } from "@/lib/data/session";
 
 type NavItem = { href: string; label: string; icon: string; badge?: string };
@@ -74,17 +75,23 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
   const storeName = ctx?.store?.name ?? "Your shop";
   const storeArea = ctx?.store?.area ?? "";
 
+  // Show only what this role can open. Default to "owner" while role is
+  // resolving; middleware is the real gate, this just hides dead links.
+  const role: Role = ctx?.role ?? "owner";
+  const primary = PRIMARY.filter((it) => canAccess(role, it.href));
+  const manage = MANAGE.filter((it) => canAccess(role, it.href));
+
   return (
     <aside className="sidebar">
       <div className="brand">
         <img src="/logomark.svg" alt="Mpato" />
         <span className="wm">Mpato</span>
       </div>
-      {PRIMARY.map((it) => (
+      {primary.map((it) => (
         <Item key={it.href} it={it} />
       ))}
-      <div className="navlabel">Manage</div>
-      {MANAGE.map((it) => (
+      {manage.length > 0 && <div className="navlabel">Manage</div>}
+      {manage.map((it) => (
         <Item key={it.href} it={it} />
       ))}
 
