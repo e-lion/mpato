@@ -76,7 +76,7 @@ export async function checkStkPushStatus(checkoutRequestId: string): Promise<{ s
     });
 
     const { data: cbData } = await supabase
-      .from("mpato_stk_callbacks")
+      .from("mpato_payments_transactions")
       .select("receipt_number")
       .eq("checkout_request_id", checkoutRequestId)
       .maybeSingle();

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
           const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
           const supabase = createClient(supabaseUrl, supabaseKey);
           
-          await supabase.from("mpato_stk_callbacks").upsert({
+          await supabase.from("mpato_payments_transactions").upsert({
             checkout_request_id: checkoutRequestId,
             receipt_number: mpesaReceiptNumber
           });
