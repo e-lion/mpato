@@ -65,13 +65,11 @@ export async function checkStkPushStatus(checkoutRequestId: string): Promise<{ s
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
+        setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
           } catch {
-            // Ignore in Server Actions
+            // Ignored for Server Components
           }
         },
       },
