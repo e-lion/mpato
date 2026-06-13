@@ -18,7 +18,7 @@ export async function initiateStkPush(amount: number, phone: string) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
                     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 
-                    "https://mpato.com");
+                    "https://mpato.novaworks.pro");
 
     const payload = {
       phone: formattedPhone,
