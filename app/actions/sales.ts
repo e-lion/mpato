@@ -36,6 +36,30 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
   }
 
   const supabase = await createSupabaseServerClient();
+
+  if (input.method === "mpesa" && ref) {
+    // 1. Verify the receipt exists in our system (the webhook delivered it)
+    const { data: receiptRecord } = await supabase
+      .from("mpato_payments_transactions")
+      .select("id")
+      .eq("receipt_number", ref)
+      .maybeSingle();
+
+    if (!receiptRecord) {
+      return { ok: false, error: "Invalid M-PESA code. This payment has not been received." };
+    }
+
+    // 2. Ensure it hasn't already been used for another sale
+    const { data: existingSale } = await supabase
+      .from("mpato_sales")
+      .select("id")
+      .eq("mpesa_reference", ref)
+      .maybeSingle();
+
+    if (existingSale) {
+      return { ok: false, error: "This M-PESA code has already been used for another sale." };
+    }
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rpc = (supabase as any).rpc.bind(supabase) as (
     fn: string,
