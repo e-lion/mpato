@@ -1,44 +1,9 @@
 "use server";
 
-function getEnv() {
-  const isProd = process.env.MPESA_ENV === "production" || process.env.NODE_ENV === "production";
-  const baseUrl = isProd
-    ? "https://api.safaricom.co.ke"
-    : "https://sandbox.safaricom.co.ke";
-
-  return {
-    baseUrl,
-    consumerKey: process.env.MPESA_CONSUMER_KEY,
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-    passkey: process.env.MPESA_PASSKEY,
-    shortcode: process.env.MPESA_SHORTCODE,
-  };
-}
-
-async function getAccessToken() {
-  const env = getEnv();
-  if (!env.consumerKey || !env.consumerSecret) throw new Error("Missing M-PESA credentials");
-
-  const auth = Buffer.from(`${env.consumerKey}:${env.consumerSecret}`).toString("base64");
-  const response = await fetch(`${env.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${auth}` },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error("M-PESA auth failed:", text);
-    throw new Error("Failed to authenticate with M-PESA");
-  }
-
-  const data = await response.json();
-  return data.access_token;
-}
-
 export async function initiateStkPush(amount: number, phone: string) {
   try {
-    const env = getEnv();
-    if (!env.shortcode || !env.passkey) throw new Error("Missing M-PESA shortcode/passkey");
+    const appKey = process.env.NOVAPAY_SECRET_KEY;
+    if (!appKey) throw new Error("Missing Novapay Secret Key");
 
     let formattedPhone = phone.replace(/\D/g, "");
     if (formattedPhone.startsWith("0")) {
@@ -51,36 +16,22 @@ export async function initiateStkPush(amount: number, phone: string) {
       return { ok: false, error: "Invalid Kenyan phone number format" };
     }
 
-    const token = await getAccessToken();
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, "")
-      .slice(0, -3);
-    const password = Buffer.from(`${env.shortcode}${env.passkey}${timestamp}`).toString("base64");
-
-    // Get the site URL for the webhook callback
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
                     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 
                     "https://mpato.com");
 
     const payload = {
-      BusinessShortCode: env.shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline", // Change to CustomerBuyGoodsOnline if Till Number
-      Amount: Math.ceil(amount),
-      PartyA: formattedPhone,
-      PartyB: env.shortcode,
-      PhoneNumber: formattedPhone,
-      CallBackURL: `${siteUrl}/api/mpesa/callback`,
-      AccountReference: "Mpato POS",
-      TransactionDesc: "POS Payment",
+      phone: formattedPhone,
+      amount: Math.ceil(amount),
+      accountReference: "Mpato POS",
+      transactionDesc: "POS Payment",
+      callbackUrl: `${siteUrl}/api/mpesa/callback`,
     };
 
-    const response = await fetch(`${env.baseUrl}/mpesa/stkpush/v1/processrequest`, {
+    const response = await fetch("https://pay.novaworks.pro/api/mpesa/stkpush", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${appKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -88,11 +39,11 @@ export async function initiateStkPush(amount: number, phone: string) {
 
     const data = await response.json();
 
-    if (data.ResponseCode === "0") {
-      return { ok: true, checkoutRequestId: data.CheckoutRequestID };
+    if (response.ok && (data.ResponseCode === "0" || data.success || data.CheckoutRequestID)) {
+      return { ok: true, checkoutRequestId: data.CheckoutRequestID || data.checkoutRequestId };
     } else {
       console.error("STK Push failed:", data);
-      return { ok: false, error: data.errorMessage || data.CustomerMessage || "Failed to initiate STK Push" };
+      return { ok: false, error: data.errorMessage || data.CustomerMessage || data.message || "Failed to initiate STK Push" };
     }
   } catch (error: any) {
     console.error("STK Push error:", error);
@@ -134,47 +85,6 @@ export async function checkStkPushStatus(checkoutRequestId: string) {
 
     if (cbData?.receipt_number) {
       return { status: "success", receipt: cbData.receipt_number };
-    }
-
-    // 2. If not in DB yet, check Daraja for failures/cancellations
-    const env = getEnv();
-    const token = await getAccessToken();
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, "")
-      .slice(0, -3);
-    const password = Buffer.from(`${env.shortcode}${env.passkey}${timestamp}`).toString("base64");
-
-    const payload = {
-      BusinessShortCode: env.shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      CheckoutRequestID: checkoutRequestId,
-    };
-
-    const response = await fetch(`${env.baseUrl}/mpesa/stkpushquery/v1/query`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    // If errorCode is present, the transaction is likely still processing
-    if (data.errorCode) {
-      return { status: "pending" };
-    }
-
-    if (data.ResultCode === "0") {
-      // Daraja says success, but webhook hasn't saved to DB yet!
-      // We keep it pending so the UI keeps polling until the webhook saves the exact receipt number.
-      return { status: "pending" };
-    } else if (data.ResultCode) {
-      // A specific ResultCode indicates failure/cancellation
-      return { status: "failed", error: data.ResultDesc || "Transaction failed" };
     }
 
     return { status: "pending" };
