@@ -14,7 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      admin_notes: {
+      cleanly_admin_notes: {
         Row: {
           author_id: string | null
           body: string
@@ -44,26 +44,26 @@ export type Database = {
             foreignKeyName: "admin_notes_author_id_fkey"
             columns: ["author_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "admin_notes_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "cleanly_cleaning_jobs"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "admin_notes_subject_user_id_fkey"
             columns: ["subject_user_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
         ]
       }
-      cleaner_locations: {
+      cleanly_cleaner_locations: {
         Row: {
           cleaner_id: string
           id: string
@@ -93,19 +93,19 @@ export type Database = {
             foreignKeyName: "cleaner_locations_cleaner_id_fkey"
             columns: ["cleaner_id"]
             isOneToOne: false
-            referencedRelation: "cleaners"
+            referencedRelation: "cleanly_cleaners"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cleaner_locations_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "cleanly_cleaning_jobs"
             referencedColumns: ["id"]
           },
         ]
       }
-      cleaners: {
+      cleanly_cleaners: {
         Row: {
           base_lat: number | null
           base_lng: number | null
@@ -159,12 +159,12 @@ export type Database = {
             foreignKeyName: "cleaners_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
-            referencedRelation: "profiles"
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
         ]
       }
-      cleaning_jobs: {
+      cleanly_cleaning_jobs: {
         Row: {
           address: string
           cleaner_id: string | null
@@ -233,26 +233,26 @@ export type Database = {
             foreignKeyName: "cleaning_jobs_cleaner_id_fkey"
             columns: ["cleaner_id"]
             isOneToOne: false
-            referencedRelation: "cleaners"
+            referencedRelation: "cleanly_cleaners"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cleaning_jobs_homeowner_id_fkey"
             columns: ["homeowner_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cleaning_jobs_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
-            referencedRelation: "properties"
+            referencedRelation: "cleanly_properties"
             referencedColumns: ["id"]
           },
         ]
       }
-      job_status_updates: {
+      cleanly_job_status_updates: {
         Row: {
           created_at: string
           created_by: string | null
@@ -282,14 +282,363 @@ export type Database = {
             foreignKeyName: "job_status_updates_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_status_updates_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_notifications: {
+        Row: {
+          body: string | null
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          id: string
+          job_id: string | null
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          job_id: string
+          provider_ref: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          job_id: string
+          provider_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          job_id?: string
+          provider_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_payout_jobs: {
+        Row: {
+          job_id: string
+          payout_id: string
+        }
+        Insert: {
+          job_id: string
+          payout_id: string
+        }
+        Update: {
+          job_id?: string
+          payout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_jobs_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_payouts: {
+        Row: {
+          amount: number
+          cleaner_id: string
+          created_at: string
+          currency: string
+          id: string
+          phone: string
+          provider_ref: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cleaner_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          phone: string
+          provider_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cleaner_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          phone?: string
+          provider_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_cleaner_id_fkey"
+            columns: ["cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          is_blocked: boolean
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id: string
+          is_blocked?: boolean
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_blocked?: boolean
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cleanly_properties: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          label: string
+          lat: number
+          lng: number
+          notes: string | null
+          owner_id: string
+          size: Database["public"]["Enums"]["property_size"]
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label: string
+          lat: number
+          lng: number
+          notes?: string | null
+          owner_id: string
+          size?: Database["public"]["Enums"]["property_size"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string
+          lat?: number
+          lng?: number
+          notes?: string | null
+          owner_id?: string
+          size?: Database["public"]["Enums"]["property_size"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_reviews: {
+        Row: {
+          author_id: string | null
+          cleaner_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          job_id: string
+          rating: number
+        }
+        Insert: {
+          author_id?: string | null
+          cleaner_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          job_id: string
+          rating: number
+        }
+        Update: {
+          author_id?: string | null
+          cleaner_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_cleaner_id_fkey"
+            columns: ["cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleanly_uploaded_media: {
+        Row: {
+          captured_at: string
+          created_at: string
+          id: string
+          job_id: string | null
+          kind: Database["public"]["Enums"]["media_kind"]
+          storage_path: string
+          uploaded_by: string | null
+          url: string | null
+        }
+        Insert: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          kind: Database["public"]["Enums"]["media_kind"]
+          storage_path: string
+          uploaded_by?: string | null
+          url?: string | null
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          kind?: Database["public"]["Enums"]["media_kind"]
+          storage_path?: string
+          uploaded_by?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uploaded_media_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cleanly_cleaning_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uploaded_media_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "cleanly_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -365,6 +714,44 @@ export type Database = {
           },
         ]
       }
+      macao_messages: {
+        Row: {
+          body: string
+          created_at: string | null
+          createdBy: string | null
+          id: string
+          status: string | null
+          tenantId: string | null
+          toPhone: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          createdBy?: string | null
+          id?: string
+          status?: string | null
+          tenantId?: string | null
+          toPhone?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          createdBy?: string | null
+          id?: string
+          status?: string | null
+          tenantId?: string | null
+          toPhone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "macao_messages_tenantId_fkey"
+            columns: ["tenantId"]
+            isOneToOne: false
+            referencedRelation: "macao_tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       macao_payments: {
         Row: {
           amount: number | null
@@ -433,6 +820,7 @@ export type Database = {
           creatorEmail: string | null
           description: string | null
           id: string
+          leaseRules: Json | null
           location: Json | null
           numberOfUnits: number | null
           paymentDetails: Json | null
@@ -447,6 +835,7 @@ export type Database = {
           creatorEmail?: string | null
           description?: string | null
           id: string
+          leaseRules?: Json | null
           location?: Json | null
           numberOfUnits?: number | null
           paymentDetails?: Json | null
@@ -461,6 +850,7 @@ export type Database = {
           creatorEmail?: string | null
           description?: string | null
           id?: string
+          leaseRules?: Json | null
           location?: Json | null
           numberOfUnits?: number | null
           paymentDetails?: Json | null
@@ -476,6 +866,7 @@ export type Database = {
           created_at: string | null
           createdBy: string | null
           creatorEmail: string | null
+          electricityDeposit: number | null
           email: string | null
           firstRentDueDate: string | null
           id: string
@@ -486,17 +877,21 @@ export type Database = {
           nationalId: string | null
           phone: string | null
           propertyId: string | null
+          rentAmount: number | null
+          rentDeposit: number | null
           securityDeposit: number | null
           status: string | null
           unitId: string | null
           unitName: string | null
           updated_at: string | null
+          waterDeposit: number | null
         }
         Insert: {
           balance?: number | null
           created_at?: string | null
           createdBy?: string | null
           creatorEmail?: string | null
+          electricityDeposit?: number | null
           email?: string | null
           firstRentDueDate?: string | null
           id: string
@@ -507,17 +902,21 @@ export type Database = {
           nationalId?: string | null
           phone?: string | null
           propertyId?: string | null
+          rentAmount?: number | null
+          rentDeposit?: number | null
           securityDeposit?: number | null
           status?: string | null
           unitId?: string | null
           unitName?: string | null
           updated_at?: string | null
+          waterDeposit?: number | null
         }
         Update: {
           balance?: number | null
           created_at?: string | null
           createdBy?: string | null
           creatorEmail?: string | null
+          electricityDeposit?: number | null
           email?: string | null
           firstRentDueDate?: string | null
           id?: string
@@ -528,11 +927,14 @@ export type Database = {
           nationalId?: string | null
           phone?: string | null
           propertyId?: string | null
+          rentAmount?: number | null
+          rentDeposit?: number | null
           securityDeposit?: number | null
           status?: string | null
           unitId?: string | null
           unitName?: string | null
           updated_at?: string | null
+          waterDeposit?: number | null
         }
         Relationships: [
           {
@@ -607,6 +1009,36 @@ export type Database = {
           },
         ]
       }
+      macao_user_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          notifications: Json | null
+          payment_methods: Json | null
+          profile: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notifications?: Json | null
+          payment_methods?: Json | null
+          profile?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notifications?: Json | null
+          payment_methods?: Json | null
+          profile?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       mpato_customers: {
         Row: {
           color: string
@@ -654,9 +1086,28 @@ export type Database = {
           },
         ]
       }
+      mpato_payments_transactions: {
+        Row: {
+          checkout_request_id: string
+          created_at: string
+          receipt_number: string
+        }
+        Insert: {
+          checkout_request_id: string
+          created_at?: string
+          receipt_number: string
+        }
+        Update: {
+          checkout_request_id?: string
+          created_at?: string
+          receipt_number?: string
+        }
+        Relationships: []
+      }
       mpato_products: {
         Row: {
           category: string
+          cost_cents: number
           created_at: string
           glyph: string
           id: string
@@ -668,6 +1119,7 @@ export type Database = {
         }
         Insert: {
           category?: string
+          cost_cents?: number
           created_at?: string
           glyph?: string
           id?: string
@@ -679,6 +1131,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          cost_cents?: number
           created_at?: string
           glyph?: string
           id?: string
@@ -748,6 +1201,7 @@ export type Database = {
           id: string
           method: Database["public"]["Enums"]["mpato_payment_method"]
           mpesa_ref: string | null
+          mpesa_ref_entered: boolean
           receipt_no: string
           store_id: string
           total_cents: number
@@ -759,6 +1213,7 @@ export type Database = {
           id?: string
           method: Database["public"]["Enums"]["mpato_payment_method"]
           mpesa_ref?: string | null
+          mpesa_ref_entered?: boolean
           receipt_no: string
           store_id: string
           total_cents: number
@@ -770,6 +1225,7 @@ export type Database = {
           id?: string
           method?: Database["public"]["Enums"]["mpato_payment_method"]
           mpesa_ref?: string | null
+          mpesa_ref_entered?: boolean
           receipt_no?: string
           store_id?: string
           total_cents?: number
@@ -831,6 +1287,108 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "mpato_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpato_stock_receipt_items: {
+        Row: {
+          id: string
+          product_id: string | null
+          product_name_snapshot: string
+          qty: number
+          receipt_id: string
+          unit_cost_cents: number
+        }
+        Insert: {
+          id?: string
+          product_id?: string | null
+          product_name_snapshot: string
+          qty: number
+          receipt_id: string
+          unit_cost_cents?: number
+        }
+        Update: {
+          id?: string
+          product_id?: string | null
+          product_name_snapshot?: string
+          qty?: number
+          receipt_id?: string
+          unit_cost_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpato_stock_receipt_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpato_stock_receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_stock_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpato_stock_receipts: {
+        Row: {
+          amount_paid_cents: number
+          created_at: string
+          delivery_date: string
+          id: string
+          notes: string | null
+          payment_status: string
+          receipt_no: string
+          received_by: string | null
+          reference: string | null
+          store_id: string
+          supplier_id: string | null
+          total_cost_cents: number
+        }
+        Insert: {
+          amount_paid_cents?: number
+          created_at?: string
+          delivery_date: string
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          receipt_no: string
+          received_by?: string | null
+          reference?: string | null
+          store_id: string
+          supplier_id?: string | null
+          total_cost_cents?: number
+        }
+        Update: {
+          amount_paid_cents?: number
+          created_at?: string
+          delivery_date?: string
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          receipt_no?: string
+          received_by?: string | null
+          reference?: string | null
+          store_id?: string
+          supplier_id?: string | null
+          total_cost_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpato_stock_receipts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpato_stock_receipts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -906,1169 +1464,482 @@ export type Database = {
         }
         Relationships: []
       }
-      notifications: {
+      mpato_supplier_payments: {
         Row: {
-          body: string | null
-          channel: Database["public"]["Enums"]["notification_channel"]
+          amount_cents: number
           created_at: string
           id: string
-          job_id: string | null
-          read_at: string | null
-          title: string
-          user_id: string
+          method: string
+          receipt_id: string
+          reference: string | null
+          store_id: string
+          supplier_id: string
         }
         Insert: {
-          body?: string | null
-          channel?: Database["public"]["Enums"]["notification_channel"]
+          amount_cents: number
           created_at?: string
           id?: string
-          job_id?: string | null
-          read_at?: string | null
-          title: string
-          user_id: string
+          method: string
+          receipt_id: string
+          reference?: string | null
+          store_id: string
+          supplier_id: string
         }
         Update: {
-          body?: string | null
-          channel?: Database["public"]["Enums"]["notification_channel"]
+          amount_cents?: number
           created_at?: string
           id?: string
-          job_id?: string | null
-          read_at?: string | null
-          title?: string
-          user_id?: string
+          method?: string
+          receipt_id?: string
+          reference?: string | null
+          store_id?: string
+          supplier_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_job_id_fkey"
-            columns: ["job_id"]
+            foreignKeyName: "mpato_supplier_payments_receipt_id_fkey"
+            columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "mpato_stock_receipts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "mpato_supplier_payments_store_id_fkey"
+            columns: ["store_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_appointments: {
-        Row: {
-          appointment_time: string
-          commission_amount: number | null
-          created_at: string | null
-          customer_id: string | null
-          id: string
-          note: string | null
-          organization_id: string | null
-          service_id: string | null
-          staff_name: string
-          status: string | null
-          user_id: string
-        }
-        Insert: {
-          appointment_time: string
-          commission_amount?: number | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          note?: string | null
-          organization_id?: string | null
-          service_id?: string | null
-          staff_name: string
-          status?: string | null
-          user_id: string
-        }
-        Update: {
-          appointment_time?: string
-          commission_amount?: number | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          note?: string | null
-          organization_id?: string | null
-          service_id?: string | null
-          staff_name?: string
-          status?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_appointments_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "pato_customers"
+            referencedRelation: "mpato_stores"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pato_appointments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_appointments_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "pato_inventory"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_categories: {
-        Row: {
-          icon: string | null
-          id: string
-          name: string
-          type: string
-        }
-        Insert: {
-          icon?: string | null
-          id?: string
-          name: string
-          type: string
-        }
-        Update: {
-          icon?: string | null
-          id?: string
-          name?: string
-          type?: string
-        }
-        Relationships: []
-      }
-      pato_customers: {
-        Row: {
-          created_at: string
-          email: string | null
-          id: string
-          metadata: Json | null
-          name: string
-          notes: string | null
-          organization_id: string | null
-          phone: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          id?: string
-          metadata?: Json | null
-          name: string
-          notes?: string | null
-          organization_id?: string | null
-          phone?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          id?: string
-          metadata?: Json | null
-          name?: string
-          notes?: string | null
-          organization_id?: string | null
-          phone?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "pato_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_customers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_goods_receipts: {
-        Row: {
-          created_at: string | null
-          id: string
-          notes: string | null
-          organization_id: string | null
-          purchase_order_id: string | null
-          receipt_date: string | null
-          received_by: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          purchase_order_id?: string | null
-          receipt_date?: string | null
-          received_by?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          purchase_order_id?: string | null
-          receipt_date?: string | null
-          received_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_goods_receipts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_goods_receipts_purchase_order_id_fkey"
-            columns: ["purchase_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_purchase_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_industries: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      pato_inventory: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          id: string
-          metadata: Json | null
-          name: string
-          organization_id: string | null
-          quantity: number
-          reorder_level: number | null
-          sku: string | null
-          unit_price: number
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          name: string
-          organization_id?: string | null
-          quantity?: number
-          reorder_level?: number | null
-          sku?: string | null
-          unit_price?: number
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          name?: string
-          organization_id?: string | null
-          quantity?: number
-          reorder_level?: number | null
-          sku?: string | null
-          unit_price?: number
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_inventory_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_organization_members: {
-        Row: {
-          created_at: string | null
-          email: string
-          id: string
-          organization_id: string
-          role: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          id?: string
-          organization_id: string
-          role?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          id?: string
-          organization_id?: string
-          role?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_organizations: {
-        Row: {
-          created_at: string | null
-          id: string
-          industry: string | null
-          kra_pin: string | null
-          name: string
-          owner_id: string
-          type: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          industry?: string | null
-          kra_pin?: string | null
-          name: string
-          owner_id: string
-          type?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          industry?: string | null
-          kra_pin?: string | null
-          name?: string
-          owner_id?: string
-          type?: string | null
-        }
-        Relationships: []
-      }
-      pato_payments: {
-        Row: {
-          amount: number
-          created_at: string | null
-          customer_id: string | null
-          id: string
-          organization_id: string | null
-          payment_date: string | null
-          payment_method: string | null
-          payment_type: string | null
-          purchase_order_id: string | null
-          recorded_by: string | null
-          sales_order_id: string | null
-          transaction_reference: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          organization_id?: string | null
-          payment_date?: string | null
-          payment_method?: string | null
-          payment_type?: string | null
-          purchase_order_id?: string | null
-          recorded_by?: string | null
-          sales_order_id?: string | null
-          transaction_reference?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          organization_id?: string | null
-          payment_date?: string | null
-          payment_method?: string | null
-          payment_type?: string | null
-          purchase_order_id?: string | null
-          recorded_by?: string | null
-          sales_order_id?: string | null
-          transaction_reference?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_payments_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "pato_customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_payments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_payments_purchase_order_id_fkey"
-            columns: ["purchase_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_purchase_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_payments_sales_order_id_fkey"
-            columns: ["sales_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_sales_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_profiles: {
-        Row: {
-          business_name: string | null
-          business_type: string | null
-          full_name: string | null
-          id: string
-          income_types: string[] | null
-          metadata: Json | null
-          organization_id: string | null
-          role: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          business_name?: string | null
-          business_type?: string | null
-          full_name?: string | null
-          id: string
-          income_types?: string[] | null
-          metadata?: Json | null
-          organization_id?: string | null
-          role?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          business_name?: string | null
-          business_type?: string | null
-          full_name?: string | null
-          id?: string
-          income_types?: string[] | null
-          metadata?: Json | null
-          organization_id?: string | null
-          role?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_purchase_order_items: {
-        Row: {
-          created_at: string | null
-          id: string
-          inventory_id: string | null
-          purchase_order_id: string | null
-          quantity: number
-          received_quantity: number | null
-          unit_cost: number
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          inventory_id?: string | null
-          purchase_order_id?: string | null
-          quantity: number
-          received_quantity?: number | null
-          unit_cost: number
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          inventory_id?: string | null
-          purchase_order_id?: string | null
-          quantity?: number
-          received_quantity?: number | null
-          unit_cost?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_purchase_order_items_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "pato_inventory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_purchase_order_items_purchase_order_id_fkey"
-            columns: ["purchase_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_purchase_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_purchase_orders: {
-        Row: {
-          amount_paid: number | null
-          created_at: string | null
-          created_by: string | null
-          expected_delivery_date: string | null
-          id: string
-          notes: string | null
-          organization_id: string | null
-          status: string | null
-          supplier_id: string | null
-          total_amount: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          amount_paid?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          expected_delivery_date?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          status?: string | null
-          supplier_id?: string | null
-          total_amount?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          amount_paid?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          expected_delivery_date?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          status?: string | null
-          supplier_id?: string | null
-          total_amount?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_purchase_orders_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_purchase_orders_supplier_id_fkey"
+            foreignKeyName: "mpato_supplier_payments_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
-            referencedRelation: "pato_suppliers"
+            referencedRelation: "mpato_suppliers"
             referencedColumns: ["id"]
           },
         ]
       }
-      pato_sales_order_items: {
+      mpato_suppliers: {
         Row: {
-          created_at: string | null
-          discount: number | null
-          id: string
-          inventory_id: string | null
-          quantity: number
-          sales_order_id: string | null
-          unit_price: number
-        }
-        Insert: {
-          created_at?: string | null
-          discount?: number | null
-          id?: string
-          inventory_id?: string | null
-          quantity: number
-          sales_order_id?: string | null
-          unit_price: number
-        }
-        Update: {
-          created_at?: string | null
-          discount?: number | null
-          id?: string
-          inventory_id?: string | null
-          quantity?: number
-          sales_order_id?: string | null
-          unit_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_sales_order_items_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "pato_inventory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_sales_order_items_sales_order_id_fkey"
-            columns: ["sales_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_sales_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_sales_orders: {
-        Row: {
-          amount_paid: number | null
-          created_at: string | null
-          created_by: string | null
-          customer_id: string | null
-          due_date: string | null
-          id: string
-          notes: string | null
-          organization_id: string | null
-          status: string | null
-          total_amount: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          amount_paid?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          customer_id?: string | null
-          due_date?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          status?: string | null
-          total_amount?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          amount_paid?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          customer_id?: string | null
-          due_date?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string | null
-          status?: string | null
-          total_amount?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_sales_orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "pato_customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_sales_orders_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_stock_ledger: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          goods_receipt_id: string | null
-          id: string
-          inventory_id: string | null
-          notes: string | null
-          organization_id: string | null
-          quantity_change: number
-          reason_code: string | null
-          sales_order_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          goods_receipt_id?: string | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          organization_id?: string | null
-          quantity_change: number
-          reason_code?: string | null
-          sales_order_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          goods_receipt_id?: string | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          organization_id?: string | null
-          quantity_change?: number
-          reason_code?: string | null
-          sales_order_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pato_stock_ledger_goods_receipt_id_fkey"
-            columns: ["goods_receipt_id"]
-            isOneToOne: false
-            referencedRelation: "pato_goods_receipts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_stock_ledger_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "pato_inventory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_stock_ledger_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pato_stock_ledger_sales_order_id_fkey"
-            columns: ["sales_order_id"]
-            isOneToOne: false
-            referencedRelation: "pato_sales_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pato_suppliers: {
-        Row: {
-          address: string | null
-          contact_person: string | null
-          created_at: string | null
-          email: string | null
+          contact: string | null
+          created_at: string
           id: string
           name: string
-          organization_id: string | null
+          notes: string | null
           phone: string | null
+          store_id: string
         }
         Insert: {
-          address?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
+          contact?: string | null
+          created_at?: string
           id?: string
           name: string
-          organization_id?: string | null
+          notes?: string | null
           phone?: string | null
+          store_id: string
         }
         Update: {
-          address?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
+          contact?: string | null
+          created_at?: string
           id?: string
           name?: string
-          organization_id?: string | null
+          notes?: string | null
           phone?: string | null
+          store_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pato_suppliers_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: "mpato_suppliers_store_id_fkey"
+            columns: ["store_id"]
             isOneToOne: false
-            referencedRelation: "pato_organizations"
+            referencedRelation: "mpato_stores"
             referencedColumns: ["id"]
           },
         ]
       }
-      pato_transactions: {
+      mpato_whatsapp_messages: {
         Row: {
-          amount: number
-          category_id: string | null
-          created_at: string | null
+          content: string
+          created_at: string
           customer_id: string | null
+          direction: string
           id: string
-          metadata: Json | null
-          note: string | null
-          organization_id: string | null
-          source: string | null
-          status: string | null
-          type: string
+          phone_number: string
+          store_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          customer_id?: string | null
+          direction: string
+          id?: string
+          phone_number: string
+          store_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          customer_id?: string | null
+          direction?: string
+          id?: string
+          phone_number?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpato_whatsapp_messages_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpato_whatsapp_messages_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "mpato_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      novapay_mpesa_transactions: {
+        Row: {
+          account_reference: string | null
+          amount: number | null
+          app_id: string | null
+          checkout_request_id: string
+          client_callback_url: string | null
+          created_at: string
+          id: string
+          phone_number: string | null
+          raw_callback: Json | null
+          receipt_number: string | null
+          result_desc: string | null
+          status: string
+        }
+        Insert: {
+          account_reference?: string | null
+          amount?: number | null
+          app_id?: string | null
+          checkout_request_id: string
+          client_callback_url?: string | null
+          created_at?: string
+          id?: string
+          phone_number?: string | null
+          raw_callback?: Json | null
+          receipt_number?: string | null
+          result_desc?: string | null
+          status: string
+        }
+        Update: {
+          account_reference?: string | null
+          amount?: number | null
+          app_id?: string | null
+          checkout_request_id?: string
+          client_callback_url?: string | null
+          created_at?: string
+          id?: string
+          phone_number?: string | null
+          raw_callback?: Json | null
+          receipt_number?: string | null
+          result_desc?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      securx_org_members: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          org_id: string
+          role: string
           user_id: string
         }
         Insert: {
-          amount: number
-          category_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
+          created_at?: string
+          display_name?: string | null
           id?: string
-          metadata?: Json | null
-          note?: string | null
-          organization_id?: string | null
-          source?: string | null
-          status?: string | null
-          type: string
+          org_id: string
+          role: string
           user_id: string
         }
         Update: {
-          amount?: number
-          category_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
+          created_at?: string
+          display_name?: string | null
           id?: string
-          metadata?: Json | null
-          note?: string | null
-          organization_id?: string | null
-          source?: string | null
-          status?: string | null
-          type?: string
+          org_id?: string
+          role?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pato_transactions_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "securx_org_members_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "pato_customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "transactions_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "pato_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "transactions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "pato_organizations"
+            referencedRelation: "securx_orgs"
             referencedColumns: ["id"]
           },
         ]
       }
-      payments: {
+      securx_orgs: {
         Row: {
-          amount: number
           created_at: string
-          currency: string
+          created_by: string
           id: string
-          job_id: string
-          provider_ref: string | null
-          status: Database["public"]["Enums"]["payment_status"]
-          updated_at: string
+          join_code: string
+          name: string
+          org_type: string
+          retention_days: number
         }
         Insert: {
-          amount: number
           created_at?: string
-          currency?: string
+          created_by: string
           id?: string
-          job_id: string
-          provider_ref?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
-          updated_at?: string
+          join_code?: string
+          name: string
+          org_type: string
+          retention_days?: number
         }
         Update: {
-          amount?: number
           created_at?: string
-          currency?: string
+          created_by?: string
           id?: string
-          job_id?: string
-          provider_ref?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payments_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "cleaning_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_jobs: {
-        Row: {
-          job_id: string
-          payout_id: string
-        }
-        Insert: {
-          job_id: string
-          payout_id: string
-        }
-        Update: {
-          job_id?: string
-          payout_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_jobs_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "cleaning_jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payout_jobs_payout_id_fkey"
-            columns: ["payout_id"]
-            isOneToOne: false
-            referencedRelation: "payouts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payouts: {
-        Row: {
-          amount: number
-          cleaner_id: string
-          created_at: string
-          currency: string
-          id: string
-          phone: string
-          provider_ref: string | null
-          status: Database["public"]["Enums"]["payment_status"]
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          cleaner_id: string
-          created_at?: string
-          currency?: string
-          id?: string
-          phone: string
-          provider_ref?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          cleaner_id?: string
-          created_at?: string
-          currency?: string
-          id?: string
-          phone?: string
-          provider_ref?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payouts_cleaner_id_fkey"
-            columns: ["cleaner_id"]
-            isOneToOne: false
-            referencedRelation: "cleaners"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          email: string | null
-          full_name: string
-          id: string
-          is_blocked: boolean
-          phone: string | null
-          role: Database["public"]["Enums"]["user_role"]
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          full_name?: string
-          id: string
-          is_blocked?: boolean
-          phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          full_name?: string
-          id?: string
-          is_blocked?: boolean
-          phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
+          join_code?: string
+          name?: string
+          org_type?: string
+          retention_days?: number
         }
         Relationships: []
       }
-      properties: {
+      securx_site_guards: {
         Row: {
-          address: string
           created_at: string
           id: string
-          is_primary: boolean
-          label: string
-          lat: number
-          lng: number
-          notes: string | null
-          owner_id: string
-          size: Database["public"]["Enums"]["property_size"]
-          updated_at: string
+          site_id: string
+          user_id: string
         }
         Insert: {
-          address: string
           created_at?: string
           id?: string
-          is_primary?: boolean
-          label: string
-          lat: number
-          lng: number
-          notes?: string | null
-          owner_id: string
-          size?: Database["public"]["Enums"]["property_size"]
-          updated_at?: string
+          site_id: string
+          user_id: string
         }
         Update: {
-          address?: string
           created_at?: string
           id?: string
-          is_primary?: boolean
-          label?: string
-          lat?: number
-          lng?: number
-          notes?: string | null
-          owner_id?: string
-          size?: Database["public"]["Enums"]["property_size"]
-          updated_at?: string
+          site_id?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "properties_owner_id_fkey"
-            columns: ["owner_id"]
+            foreignKeyName: "securx_site_guards_site_id_fkey"
+            columns: ["site_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "securx_sites"
             referencedColumns: ["id"]
           },
         ]
       }
-      reviews: {
+      securx_sites: {
         Row: {
-          author_id: string | null
-          cleaner_id: string
-          comment: string | null
+          active: boolean
+          address: string | null
+          code: string
+          county: string | null
           created_at: string
+          created_by: string
+          firm_org_id: string | null
           id: string
-          job_id: string
-          rating: number
+          link_code: string
+          name: string
+          owner_org_id: string | null
         }
         Insert: {
-          author_id?: string | null
-          cleaner_id: string
-          comment?: string | null
+          active?: boolean
+          address?: string | null
+          code?: string
+          county?: string | null
           created_at?: string
+          created_by: string
+          firm_org_id?: string | null
           id?: string
-          job_id: string
-          rating: number
+          link_code?: string
+          name: string
+          owner_org_id?: string | null
         }
         Update: {
-          author_id?: string | null
-          cleaner_id?: string
-          comment?: string | null
+          active?: boolean
+          address?: string | null
+          code?: string
+          county?: string | null
           created_at?: string
+          created_by?: string
+          firm_org_id?: string | null
           id?: string
-          job_id?: string
-          rating?: number
+          link_code?: string
+          name?: string
+          owner_org_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "reviews_author_id_fkey"
-            columns: ["author_id"]
+            foreignKeyName: "securx_sites_firm_org_id_fkey"
+            columns: ["firm_org_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "securx_orgs"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "reviews_cleaner_id_fkey"
-            columns: ["cleaner_id"]
+            foreignKeyName: "securx_sites_owner_org_id_fkey"
+            columns: ["owner_org_id"]
             isOneToOne: false
-            referencedRelation: "cleaners"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reviews_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: true
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "securx_orgs"
             referencedColumns: ["id"]
           },
         ]
       }
-      uploaded_media: {
+      securx_sms_log: {
         Row: {
-          captured_at: string
+          at_http_status: number | null
+          at_response: string | null
           created_at: string
           id: string
-          job_id: string | null
-          kind: Database["public"]["Enums"]["media_kind"]
-          storage_path: string
-          uploaded_by: string | null
-          url: string | null
+          outcome: string | null
+          to_phone: string | null
         }
         Insert: {
-          captured_at?: string
+          at_http_status?: number | null
+          at_response?: string | null
           created_at?: string
           id?: string
-          job_id?: string | null
-          kind: Database["public"]["Enums"]["media_kind"]
-          storage_path: string
-          uploaded_by?: string | null
-          url?: string | null
+          outcome?: string | null
+          to_phone?: string | null
         }
         Update: {
-          captured_at?: string
+          at_http_status?: number | null
+          at_response?: string | null
           created_at?: string
           id?: string
-          job_id?: string | null
-          kind?: Database["public"]["Enums"]["media_kind"]
-          storage_path?: string
-          uploaded_by?: string | null
-          url?: string | null
+          outcome?: string | null
+          to_phone?: string | null
+        }
+        Relationships: []
+      }
+      securx_visitors: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          last_seen_at: string
+          national_id: string
+          org_id: string
+          phone: string | null
+          visit_count: number
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+          last_seen_at?: string
+          national_id: string
+          org_id: string
+          phone?: string | null
+          visit_count?: number
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          last_seen_at?: string
+          national_id?: string
+          org_id?: string
+          phone?: string | null
+          visit_count?: number
         }
         Relationships: [
           {
-            foreignKeyName: "uploaded_media_job_id_fkey"
-            columns: ["job_id"]
+            foreignKeyName: "securx_visitors_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_jobs"
+            referencedRelation: "securx_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      securx_visits: {
+        Row: {
+          anonymised_at: string | null
+          checked_in_at: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          client_id: string | null
+          created_at: string
+          destination: string | null
+          full_name: string
+          guard_id: string | null
+          id: string
+          national_id: string | null
+          phone: string | null
+          purpose: string | null
+          site_id: string
+          source: string
+          status: string
+          vehicle_plate: string | null
+          visitor_id: string | null
+        }
+        Insert: {
+          anonymised_at?: string | null
+          checked_in_at?: string
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          destination?: string | null
+          full_name: string
+          guard_id?: string | null
+          id?: string
+          national_id?: string | null
+          phone?: string | null
+          purpose?: string | null
+          site_id: string
+          source?: string
+          status?: string
+          vehicle_plate?: string | null
+          visitor_id?: string | null
+        }
+        Update: {
+          anonymised_at?: string | null
+          checked_in_at?: string
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          destination?: string | null
+          full_name?: string
+          guard_id?: string | null
+          id?: string
+          national_id?: string | null
+          phone?: string | null
+          purpose?: string | null
+          site_id?: string
+          source?: string
+          status?: string
+          vehicle_plate?: string | null
+          visitor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "securx_visits_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "securx_sites"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "uploaded_media_uploaded_by_fkey"
-            columns: ["uploaded_by"]
+            foreignKeyName: "securx_visits_visitor_id_fkey"
+            columns: ["visitor_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "securx_visitors"
             referencedColumns: ["id"]
           },
         ]
@@ -2086,11 +1957,103 @@ export type Database = {
       get_user_organizations_v3: { Args: never; Returns: string[] }
       get_user_organizations_v4: { Args: never; Returns: string[] }
       is_admin: { Args: never; Returns: boolean }
+      mpato_accept_invite: { Args: never; Returns: string }
       mpato_is_store_member: { Args: { p_store: string }; Returns: boolean }
+      mpato_provision_store: { Args: { p_shop_name: string }; Returns: string }
+      mpato_receive_stock: {
+        Args: {
+          p_delivery_date: string
+          p_items: Json
+          p_notes: string
+          p_reference: string
+          p_store_id: string
+          p_supplier_id: string
+        }
+        Returns: {
+          out_line_count: number
+          out_receipt_id: string
+          out_receipt_no: string
+          out_total_cents: number
+        }[]
+      }
+      mpato_record_sale: {
+        Args: {
+          p_customer_id?: string
+          p_items: Json
+          p_method: string
+          p_mpesa_ref?: string
+          p_store_id: string
+        }
+        Returns: {
+          out_mpesa_ref: string
+          out_receipt_no: string
+          out_sale_id: string
+          out_total_cents: number
+        }[]
+      }
+      mpato_remove_staff: { Args: { p_staff_id: string }; Returns: undefined }
+      mpato_store_cashiers: {
+        Args: { p_store_id: string }
+        Returns: {
+          name: string
+          user_id: string
+        }[]
+      }
+      mpato_sync_member_role: {
+        Args: { p_staff_id: string }
+        Returns: undefined
+      }
+      mpato_top_products: {
+        Args: { p_limit?: number; p_store_id: string }
+        Returns: {
+          glyph: string
+          name: string
+          product_id: string
+          revenue: number
+          sold: number
+          tile: string
+        }[]
+      }
+      mpato_week_sales: {
+        Args: { p_store_id: string }
+        Returns: {
+          cash: number
+          day_label: string
+          mpesa: number
+        }[]
+      }
       recompute_cleaner_rating: {
         Args: { p_cleaner_id: string }
         Returns: undefined
       }
+      securx_anonymise_expired: { Args: never; Returns: number }
+      securx_can_access_site: { Args: { p_site: string }; Returns: boolean }
+      securx_is_org_admin: { Args: { p_org: string }; Returns: boolean }
+      securx_join_org: { Args: { p_code: string }; Returns: string }
+      securx_link_site: {
+        Args: { p_link_code: string; p_org: string }
+        Returns: string
+      }
+      securx_self_checkin: {
+        Args: {
+          p_client_id?: string
+          p_destination?: string
+          p_full_name: string
+          p_national_id: string
+          p_phone?: string
+          p_purpose?: string
+          p_site_code: string
+          p_vehicle_plate?: string
+        }
+        Returns: string
+      }
+      securx_site_public_info: {
+        Args: { p_site_code: string }
+        Returns: {
+          site_name: string
+        }[]
+      }
+      securx_user_orgs: { Args: never; Returns: string[] }
     }
     Enums: {
       cleaner_verification_status:

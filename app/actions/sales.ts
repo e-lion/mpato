@@ -39,23 +39,32 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
 
   if (input.method === "mpesa" && ref) {
     // 1. Verify the receipt exists in our system (the webhook delivered it)
-    const { data: receiptRecord } = await supabase
+    const { data: receiptRecord, error: receiptErr } = await supabase
       .from("mpato_payments_transactions")
       .select("id")
       .eq("receipt_number", ref)
       .maybeSingle();
 
+    if (receiptErr) {
+      return { ok: false, error: "Could not verify the M-PESA payment. Try again." };
+    }
     if (!receiptRecord) {
       return { ok: false, error: "Invalid M-PESA code. This payment has not been received." };
     }
 
-    // 2. Ensure it hasn't already been used for another sale
-    const { data: existingSale } = await supabase
+    // 2. Best-effort early-out if the code was already used. This is RLS-scoped
+    //    (a cashier only sees their own stores' sales), so cross-store reuse is
+    //    caught by mpato_record_sale's global check + the unique index, not here.
+    const { data: existingSale, error: dupErr } = await supabase
       .from("mpato_sales")
       .select("id")
-      .eq("mpesa_reference", ref)
+      .eq("mpesa_ref", ref)
+      .eq("mpesa_ref_entered", true)
       .maybeSingle();
 
+    if (dupErr) {
+      return { ok: false, error: "Could not verify the M-PESA payment. Try again." };
+    }
     if (existingSale) {
       return { ok: false, error: "This M-PESA code has already been used for another sale." };
     }
