@@ -1,5 +1,11 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { relativeTime } from "./format";
+import {
+  ACTIVE_STORE_COOKIE,
+  getMemberships,
+  pickActiveStore,
+} from "./active-store";
 import type { Customer, Product, RecentSale } from "./types";
 import type { TileKey } from "@/lib/mockData";
 
@@ -16,15 +22,13 @@ export async function getCurrentStoreId(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from("mpato_store_members")
-    .select("store_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return (data as { store_id: string }).store_id;
+  const memberships = await getMemberships(supabase, user.id);
+  const cookieStore = await cookies();
+  const active = pickActiveStore(
+    memberships,
+    cookieStore.get(ACTIVE_STORE_COOKIE)?.value,
+  );
+  return active?.storeId ?? null;
 }
 
 export async function getProducts(storeId: string): Promise<Product[]> {
@@ -533,4 +537,95 @@ export async function getDashboardStats(storeId: string): Promise<DashboardStats
   const newCustomers = ((newCust ?? []) as Row[]).length;
 
   return { salesToday, ordersToday, newCustomers, lowStock, mpesaToday, cashToday };
+}
+
+export type OwnerStoreToday = {
+  storeId: string;
+  name: string;
+  area: string | null;
+  salesToday: number;
+  ordersToday: number;
+  mpesaToday: number;
+  cashToday: number;
+};
+
+export type OwnerOverview = {
+  stores: OwnerStoreToday[];
+  combined: { salesToday: number; ordersToday: number; mpesaToday: number; cashToday: number };
+};
+
+/** Today's sales rolled up across every shop the current user OWNS. Returns null
+ *  unless they own at least two shops — the consolidated view only matters then.
+ *  RLS already limits visibility to the user's own stores; the store_id filter
+ *  just scopes it to the ones they own (vs. ones they only staff). */
+export async function getOwnerStoresOverview(): Promise<OwnerOverview | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const memberships = await getMemberships(supabase, user.id);
+  const owned = memberships.filter((m) => m.role === "owner");
+  if (owned.length < 2) return null;
+
+  const ids = owned.map((m) => m.storeId);
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const iso = startOfDay.toISOString();
+
+  const [{ data: storeRows }, { data: salesRows }] = await Promise.all([
+    supabase.from("mpato_stores").select("id, name, area").in("id", ids),
+    supabase
+      .from("mpato_sales")
+      .select("store_id, total_cents, method")
+      .in("store_id", ids)
+      .gte("created_at", iso),
+  ]);
+
+  const meta = new Map<string, { name: string; area: string | null }>(
+    ((storeRows ?? []) as Row[]).map((s) => [
+      s.id as string,
+      { name: s.name as string, area: (s.area as string | null) ?? null },
+    ]),
+  );
+
+  const agg = new Map<string, { sales: number; orders: number; mpesa: number; cash: number }>();
+  for (const id of ids) agg.set(id, { sales: 0, orders: 0, mpesa: 0, cash: 0 });
+  for (const r of (salesRows ?? []) as Row[]) {
+    const a = agg.get(r.store_id as string);
+    if (!a) continue;
+    const cents = Number(r.total_cents) || 0;
+    a.sales += cents;
+    a.orders += 1;
+    if (r.method === "mpesa") a.mpesa += cents;
+    else a.cash += cents;
+  }
+
+  const stores: OwnerStoreToday[] = owned
+    .map((m) => {
+      const a = agg.get(m.storeId)!;
+      const info = meta.get(m.storeId);
+      return {
+        storeId: m.storeId,
+        name: info?.name ?? "Shop",
+        area: info?.area ?? null,
+        salesToday: a.sales / 100,
+        ordersToday: a.orders,
+        mpesaToday: a.mpesa / 100,
+        cashToday: a.cash / 100,
+      };
+    })
+    .sort((x, y) => y.salesToday - x.salesToday);
+
+  const combined = stores.reduce(
+    (acc, s) => ({
+      salesToday: acc.salesToday + s.salesToday,
+      ordersToday: acc.ordersToday + s.ordersToday,
+      mpesaToday: acc.mpesaToday + s.mpesaToday,
+      cashToday: acc.cashToday + s.cashToday,
+    }),
+    { salesToday: 0, ordersToday: 0, mpesaToday: 0, cashToday: 0 },
+  );
+
+  return { stores, combined };
 }

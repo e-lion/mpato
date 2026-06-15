@@ -2,6 +2,7 @@ import { Dashboard } from "@/components/app/Dashboard";
 import {
   getCurrentStoreId,
   getDashboardStats,
+  getOwnerStoresOverview,
   getRecentSales,
   getTopProducts,
   getWeekSales,
@@ -19,13 +20,14 @@ export default async function DashboardPage() {
       />
     );
   }
-  const [stats, sales, week, topProducts] = await Promise.all([
+  const [stats, sales, week, topProducts, overview] = await Promise.all([
     getDashboardStats(storeId),
     getRecentSales(storeId, 5),
     getWeekSales(storeId),
     getTopProducts(storeId, 4),
+    getOwnerStoresOverview(),
   ]);
   return (
-    <Dashboard stats={stats} sales={sales} week={week} topProducts={topProducts} />
+    <Dashboard stats={stats} sales={sales} week={week} topProducts={topProducts} overview={overview} />
   );
 }

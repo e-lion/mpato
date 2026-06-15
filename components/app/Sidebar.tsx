@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
+import { StoreSwitcher } from "./StoreSwitcher";
 import { canAccess, type Role } from "@/lib/auth/access";
 import type { SessionContext } from "@/lib/data/session";
 
@@ -23,15 +24,6 @@ const MANAGE: NavItem[] = [
   { href: "/staff", label: "Staff", icon: "user-round" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
-
-function storeInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("") || "S";
-}
 
 export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
   const pathname = usePathname() ?? "";
@@ -72,9 +64,6 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
     );
   };
 
-  const storeName = ctx?.store?.name ?? "Your shop";
-  const storeArea = ctx?.store?.area ?? "";
-
   // Show only what this role can open. Default to "owner" while role is
   // resolving; middleware is the real gate, this just hides dead links.
   const role: Role = ctx?.role ?? "owner";
@@ -96,14 +85,7 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
       ))}
 
       <div className="sidebar-foot">
-        <div className="store-switch">
-          <div className="av">{storeInitials(storeName)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="nm">{storeName}</div>
-            <div className="sub">{storeArea || "1 store"}</div>
-          </div>
-          <Icon name="chevrons-up-down" size={16} color="var(--fg3)" />
-        </div>
+        <StoreSwitcher ctx={ctx} />
       </div>
     </aside>
   );

@@ -2,8 +2,73 @@ import { Icon } from "./Icon";
 import { Badge } from "./primitives";
 import { KES } from "@/lib/format";
 import { TILES } from "@/lib/mockData";
-import type { DashboardStats, TopProduct, WeekDay } from "@/lib/data/queries";
+import type { DashboardStats, OwnerOverview, TopProduct, WeekDay } from "@/lib/data/queries";
 import type { RecentSale } from "@/lib/data/types";
+
+function storeInitials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "S"
+  );
+}
+
+function StoresOverview({ overview }: { overview: OwnerOverview }) {
+  const { stores, combined } = overview;
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div className="section-h">
+        <h2>Across your shops</h2>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg3)" }}>
+          {stores.length} shops · today
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "4px 0 18px" }}>
+        <div className="num" style={{ fontWeight: 800, fontFamily: "var(--font-display)", fontSize: 28 }}>
+          {KES(combined.salesToday)}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--fg3)" }}>
+          {combined.ordersToday} orders · {KES(combined.mpesaToday)} M-PESA · {KES(combined.cashToday)} cash
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {stores.map((s) => {
+          const pct = combined.salesToday > 0 ? Math.round((s.salesToday / combined.salesToday) * 100) : 0;
+          return (
+            <div key={s.storeId} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                className="av"
+                style={{ width: 34, height: 34, fontSize: 13, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: "var(--r-md)", background: "var(--rose-50)", color: "var(--rose-700)", fontWeight: 700 }}
+              >
+                {storeInitials(s.name)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.name}
+                    {s.area ? <span style={{ color: "var(--fg3)", fontWeight: 400 }}> · {s.area}</span> : null}
+                  </div>
+                  <div className="num" style={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{KES(s.salesToday)}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
+                  <div style={{ flex: 1, height: 6, borderRadius: "var(--r-pill)", background: "var(--stone-100, var(--border))", overflow: "hidden" }}>
+                    <div style={{ width: pct + "%", height: "100%", background: "var(--mpesa)" }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--fg3)", width: 78, textAlign: "right", flexShrink: 0 }}>
+                    {s.ordersToday} {s.ordersToday === 1 ? "order" : "orders"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function KpiTile({
   icon,
@@ -194,14 +259,17 @@ export function Dashboard({
   sales,
   week,
   topProducts,
+  overview,
 }: {
   stats: DashboardStats;
   sales: RecentSale[];
   week: WeekDay[];
   topProducts: TopProduct[];
+  overview?: OwnerOverview | null;
 }) {
   return (
     <div className="page-w" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {overview && <StoresOverview overview={overview} />}
       <div className="kpis">
         <KpiTile
           icon="trending-up"

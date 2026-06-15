@@ -1,10 +1,20 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isRole, type Role } from "@/lib/auth/access";
+import { type Role } from "@/lib/auth/access";
+import {
+  ACTIVE_STORE_COOKIE,
+  getMemberships,
+  pickActiveStore,
+} from "./active-store";
+
+export type StoreOption = { id: string; name: string; area: string | null; role: Role };
 
 export type SessionContext = {
   user: { id: string; email: string | null; fullName: string; firstName: string; initials: string };
   store: { id: string; name: string; area: string | null } | null;
   role: Role | null;
+  /** Every store this user belongs to, for the store switcher. */
+  stores: StoreOption[];
 };
 
 function deriveName(fullName: string | null, email: string | null): { full: string; first: string; initials: string } {
@@ -29,25 +39,45 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   const { full, first, initials } = deriveName(fullNameRaw, user.email ?? null);
 
-  // Resolve the store + role via membership (works for owners and staff alike).
-  const { data: memberRow } = await supabase
-    .from("mpato_store_members")
-    .select("role, mpato_stores ( id, name, area )")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // Resolve the active store + the role *for that store* (a user can be owner of
+  // one shop and cashier of another). Works for owners and staff alike.
+  const memberships = await getMemberships(supabase, user.id);
+  const cookieStore = await cookies();
+  const active = pickActiveStore(
+    memberships,
+    cookieStore.get(ACTIVE_STORE_COOKIE)?.value,
+  );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const m = memberRow as any;
-  const storeData = m && typeof m.mpato_stores === "object" ? m.mpato_stores : null;
-  const store = storeData
-    ? {
-        id: storeData.id as string,
-        name: storeData.name as string,
-        area: (storeData.area as string | null) ?? null,
-      }
+  let stores: StoreOption[] = [];
+  if (memberships.length > 0) {
+    const ids = memberships.map((mm) => mm.storeId);
+    const { data: storeRows } = await supabase
+      .from("mpato_stores")
+      .select("id, name, area")
+      .in("id", ids);
+    const byId = new Map(
+      ((storeRows ?? []) as { id: string; name: string; area: string | null }[]).map(
+        (s) => [s.id, s],
+      ),
+    );
+    stores = memberships.map((mm) => {
+      const s = byId.get(mm.storeId);
+      return {
+        id: mm.storeId,
+        name: s?.name ?? "Shop",
+        area: s?.area ?? null,
+        role: mm.role,
+      };
+    });
+  }
+
+  const activeOption = active
+    ? stores.find((s) => s.id === active.storeId) ?? null
     : null;
-  const role: Role | null = m && isRole(m.role) ? m.role : null;
+  const store = activeOption
+    ? { id: activeOption.id, name: activeOption.name, area: activeOption.area }
+    : null;
+  const role: Role | null = active?.role ?? null;
 
   return {
     user: {
@@ -59,5 +89,6 @@ export async function getSessionContext(): Promise<SessionContext | null> {
     },
     store,
     role,
+    stores,
   };
 }

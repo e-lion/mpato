@@ -1,6 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { canAccess, isRole, landingFor } from "@/lib/auth/access";
+import { canAccess, landingFor } from "@/lib/auth/access";
+import {
+  ACTIVE_STORE_COOKIE,
+  getMemberships,
+  pickActiveStore,
+} from "@/lib/data/active-store";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -47,18 +52,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Role-based guard: keep cashiers/managers out of pages above their role.
+  // Use the role for the *active* store, since a user's role varies per store.
   if (user && isProtected) {
-    const { data: member } = await supabase
-      .from("mpato_store_members")
-      .select("role")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    const role = (member as { role?: string } | null)?.role;
-    if (isRole(role) && !canAccess(role, path)) {
+    const memberships = await getMemberships(supabase, user.id);
+    const active = pickActiveStore(
+      memberships,
+      request.cookies.get(ACTIVE_STORE_COOKIE)?.value,
+    );
+    if (active && !canAccess(active.role, path)) {
       const url = request.nextUrl.clone();
-      url.pathname = landingFor(role);
+      url.pathname = landingFor(active.role);
       url.search = "";
       return NextResponse.redirect(url);
     }
