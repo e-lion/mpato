@@ -27,7 +27,6 @@ export function Messages({
   const [inputValue, setInputValue] = useState("");
   const [status, setStatus] = useState("disconnected");
   
-  const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Keep track of the currently selected customer without triggering socket reconnects
