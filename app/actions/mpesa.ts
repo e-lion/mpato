@@ -2,8 +2,8 @@
 
 export async function initiateStkPush(amount: number, phone: string) {
   try {
-    const appKey = process.env.NOVAPAY_SECRET_KEY;
-    if (!appKey) throw new Error("Missing Novapay Secret Key");
+    const appKey = process.env.NOVAPAY_APP_KEY?.trim();
+    if (!appKey) throw new Error("Missing Novapay App Key");
 
     let formattedPhone = phone.replace(/\D/g, "");
     if (formattedPhone.startsWith("0")) {
@@ -39,11 +39,11 @@ export async function initiateStkPush(amount: number, phone: string) {
 
     const data = await response.json();
 
-    if (response.ok && (data.ResponseCode === "0" || data.success || data.CheckoutRequestID)) {
-      return { ok: true, checkoutRequestId: data.CheckoutRequestID || data.checkoutRequestId };
+    if (response.ok && (data.success || data.checkoutRequestID || data.CheckoutRequestID || data.ResponseCode === "0")) {
+      return { ok: true, checkoutRequestId: data.checkoutRequestID || data.CheckoutRequestID };
     } else {
-      console.error("STK Push failed:", data);
-      return { ok: false, error: data.errorMessage || data.CustomerMessage || data.message || "Failed to initiate STK Push" };
+      console.error("STK Push failed. Response payload:", JSON.stringify(data, null, 2));
+      return { ok: false, error: data.error || data.message || data.CustomerMessage || "Failed to initiate STK Push" };
     }
   } catch (error: any) {
     console.error("STK Push error:", error);

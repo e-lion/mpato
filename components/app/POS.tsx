@@ -241,8 +241,10 @@ export function POS({
   const sendWhatsAppReceipt = () => {
     if (!selectedCustomer?.phone || !settings || !done) return;
     setWsStatus("connecting");
-    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "http://localhost:4000";
-    const socket = io(workerUrl);
+    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
+    const socket = io(workerUrl, {
+      auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
+    });
     const sessionId = settings.id;
 
     socket.on("connect", () => {

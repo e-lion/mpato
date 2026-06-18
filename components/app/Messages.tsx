@@ -34,8 +34,10 @@ export function Messages({
 
   // Connect to WebSocket
   useEffect(() => {
-    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "http://localhost:4000";
-    const socket = io(workerUrl);
+    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
+    const socket = io(workerUrl, {
+      auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {
