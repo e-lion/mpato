@@ -117,9 +117,21 @@ export function Messages({
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !selectedCustomer || !selectedCustomer.phone || !socketRef.current) return;
-    
-    socketRef.current.emit("send_message", { sessionId, to: selectedCustomer.phone, text: inputValue });
+    if (!inputValue.trim() || !selectedCustomer || !socketRef.current) return;
+
+    let to = selectedCustomer.phone?.replace(/\D/g, "") || "";
+    if (to.startsWith("0")) {
+      to = "254" + to.slice(1);
+    } else if (to.startsWith("+")) {
+      to = to.slice(1);
+    }
+
+    if (!to.startsWith("254") || to.length !== 12) {
+      alert("Invalid customer phone number format. Cannot send message.");
+      return;
+    }
+
+    socketRef.current.emit("send_message", { sessionId, to, text: inputValue });
     setInputValue("");
   };
 

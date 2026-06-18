@@ -64,13 +64,25 @@ export function WhatsAppIntegration({ storeId }: { storeId?: string }) {
   const handleTestMessage = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const to = formData.get('to') as string;
+    const rawTo = formData.get('to') as string;
     const text = formData.get('text') as string;
 
-    if (to && text && socketRef.current) {
-      socketRef.current.emit('send_message', { sessionId, to, text });
-      e.currentTarget.reset();
+    if (!rawTo || !text || !socketRef.current) return;
+
+    let to = rawTo.replace(/\D/g, "");
+    if (to.startsWith("0")) {
+      to = "254" + to.slice(1);
+    } else if (to.startsWith("+")) {
+      to = to.slice(1);
     }
+
+    if (!to.startsWith("254") || to.length !== 12) {
+      alert("Invalid phone number. Must be a valid 12-digit Kenyan number (e.g. 2547...).");
+      return;
+    }
+
+    socketRef.current.emit('send_message', { sessionId, to, text });
+    e.currentTarget.reset();
   };
 
   const handleDisconnect = () => {

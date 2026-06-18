@@ -41,11 +41,12 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
     // 1. Verify the receipt exists in our system (the webhook delivered it)
     const { data: receiptRecord, error: receiptErr } = await supabase
       .from("mpato_payments_transactions")
-      .select("id")
+      .select("receipt_number")
       .eq("receipt_number", ref)
       .maybeSingle();
 
     if (receiptErr) {
+      console.error("recordSale receiptErr:", receiptErr);
       return { ok: false, error: "Could not verify the M-PESA payment. Try again." };
     }
     if (!receiptRecord) {
@@ -57,12 +58,13 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
     //    caught by mpato_record_sale's global check + the unique index, not here.
     const { data: existingSale, error: dupErr } = await supabase
       .from("mpato_sales")
-      .select("id")
+      .select("mpesa_ref")
       .eq("mpesa_ref", ref)
       .eq("mpesa_ref_entered", true)
       .maybeSingle();
 
     if (dupErr) {
+      console.error("recordSale dupErr:", dupErr);
       return { ok: false, error: "Could not verify the M-PESA payment. Try again." };
     }
     if (existingSale) {

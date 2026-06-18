@@ -240,12 +240,29 @@ export function POS({
 
   const sendWhatsAppReceipt = () => {
     if (!selectedCustomer?.phone || !settings || !done) return;
+    
+    // Normalize and validate phone number
+    let formattedPhone = selectedCustomer.phone.replace(/\D/g, "");
+    if (formattedPhone.startsWith("0")) {
+      formattedPhone = "254" + formattedPhone.slice(1);
+    } else if (formattedPhone.startsWith("+")) {
+      formattedPhone = formattedPhone.slice(1);
+    }
+
+    if (!formattedPhone.startsWith("254") || formattedPhone.length !== 12) {
+      alert("Invalid phone number format. It must be a valid 12-digit Kenyan number (e.g. 2547...).");
+      setWsStatus("error");
+      return;
+    }
+
     setWsStatus("connecting");
     const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
     const socket = io(workerUrl, {
       auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
     });
     const sessionId = settings.id;
+
+    let timeout: NodeJS.Timeout;
 
     socket.on("connect", () => {
       setWsStatus("sending");
@@ -254,15 +271,22 @@ export function POS({
       const linesText = done.lines.map((l) => `${l.name} x${l.qty} = KES ${l.unitPrice * l.qty}`).join("\n");
       const text = `=====================\n  ${shopName}\n=====================\nReceipt #: ${done.receiptNo}\nDate: ${new Date(done.createdAt).toLocaleString()}\n\nItems:\n${linesText}\n\nTotal: KES ${done.total}\nMethod: ${done.method}\n\nThank you for your business!\n=====================`;
 
-      socket.emit("send_message", { sessionId, to: selectedCustomer.phone, text });
+      socket.emit("send_message", { sessionId, to: formattedPhone, text });
+
+      // Fallback timeout in case the worker never replies
+      timeout = setTimeout(() => {
+        setWsStatus("error");
+        socket.disconnect();
+      }, 10000);
     });
 
     socket.on("message_sent", (data) => {
       if (data.sessionId === sessionId) {
+        clearTimeout(timeout);
         if (data.success) {
           setWsStatus("sent");
           import("@/app/actions/messages").then(({ saveMessage }) => {
-            saveMessage(sessionId, selectedCustomer.phone!, "outbound", data.text);
+            saveMessage(sessionId, formattedPhone, "outbound", data.text);
           });
         } else {
           setWsStatus("error");
