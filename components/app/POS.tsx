@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { io } from "socket.io-client";
 import { Icon } from "./Icon";
 import { Avatar, Badge, Btn } from "./primitives";
 import { KES } from "@/lib/format";
@@ -10,6 +9,7 @@ import { CATEGORIES, type Customer, type Product } from "@/lib/data/types";
 import type { StoreSettings } from "@/lib/data/queries";
 import { recordSale } from "@/app/actions/sales";
 import { initiateStkPush, checkStkPushStatus } from "@/app/actions/mpesa";
+import { sendWhatsAppMessage } from "@/app/actions/whatsapp";
 import { Receipt, type ReceiptData } from "./Receipt";
 
 type Cart = Record<string, number>;
@@ -238,7 +238,7 @@ export function POS({
     closePicker();
   };
 
-  const sendWhatsAppReceipt = () => {
+  const sendWhatsAppReceipt = async () => {
     if (!selectedCustomer?.phone || !settings || !done) return;
     
     // Normalize and validate phone number
@@ -255,50 +255,24 @@ export function POS({
       return;
     }
 
-    setWsStatus("connecting");
-    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
-    const socket = io(workerUrl, {
-      auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
-    });
-    const sessionId = settings.id;
-
-    let timeout: NodeJS.Timeout;
-
-    socket.on("connect", () => {
-      setWsStatus("sending");
-      
-      const shopName = settings.name;
-      const linesText = done.lines.map((l) => `${l.name} x${l.qty} = KES ${l.unitPrice * l.qty}`).join("\n");
-      const text = `=====================\n  ${shopName}\n=====================\nReceipt #: ${done.receiptNo}\nDate: ${new Date(done.createdAt).toLocaleString()}\n\nItems:\n${linesText}\n\nTotal: KES ${done.total}\nMethod: ${done.method}\n\nThank you for your business!\n=====================`;
-
-      socket.emit("send_message", { sessionId, to: formattedPhone, text });
-
-      // Fallback timeout in case the worker never replies
-      timeout = setTimeout(() => {
-        setWsStatus("error");
-        socket.disconnect();
-      }, 10000);
-    });
-
-    socket.on("message_sent", (data) => {
-      if (data.sessionId === sessionId) {
-        clearTimeout(timeout);
-        if (data.success) {
-          setWsStatus("sent");
-          import("@/app/actions/messages").then(({ saveMessage }) => {
-            saveMessage(sessionId, formattedPhone, "outbound", data.text);
-          });
-        } else {
-          setWsStatus("error");
-        }
-        setTimeout(() => socket.disconnect(), 500);
-      }
-    });
+    setWsStatus("sending");
     
-    socket.on("connect_error", () => {
+    const shopName = settings.name;
+    const linesText = done.lines.map((l) => `${l.name} x${l.qty} = KES ${l.unitPrice * l.qty}`).join("\n");
+    const text = `=====================\n  ${shopName}\n=====================\nReceipt #: ${done.receiptNo}\nDate: ${new Date(done.createdAt).toLocaleString()}\n\nItems:\n${linesText}\n\nTotal: KES ${done.total}\nMethod: ${done.method}\n\nThank you for your business!\n=====================`;
+
+    try {
+      const res = await sendWhatsAppMessage(settings.id, formattedPhone, text);
+      if (res.success) {
+        setWsStatus("sent");
+      } else {
+        setWsStatus("error");
+        console.error("WhatsApp Error:", res.error);
+      }
+    } catch (err) {
       setWsStatus("error");
-      socket.disconnect();
-    });
+      console.error(err);
+    }
   };
 
   return (

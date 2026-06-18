@@ -37,7 +37,14 @@ export async function initiateStkPush(amount: number, phone: string) {
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Non-JSON response from NovaPay:", response.status, responseText.slice(0, 500));
+      return { ok: false, error: `NovaPay gateway returned an invalid response (Status ${response.status}). It might be blocking the server.` };
+    }
 
     if (response.ok && (data.success || data.checkoutRequestID || data.CheckoutRequestID || data.ResponseCode === "0")) {
       return { ok: true, checkoutRequestId: data.checkoutRequestID || data.CheckoutRequestID };

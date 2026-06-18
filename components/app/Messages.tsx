@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { io, Socket } from "socket.io-client";
+import { createClient } from "@supabase/supabase-js";
 import { Icon } from "@/components/app/Icon";
 import { Btn } from "@/components/app/primitives";
 import { saveMessage, getChatHistory } from "@/app/actions/messages";
+import { sendWhatsAppMessage, getWhatsAppStatus } from "@/app/actions/whatsapp";
 import type { Customer } from "@/lib/data/types";
 import { relativeTime } from "@/lib/data/format";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export function Messages({ 
   storeId, 
@@ -32,70 +38,49 @@ export function Messages({
 
   const sessionId = storeId;
 
-  // Connect to WebSocket
+  // Poll WhatsApp connection status
   useEffect(() => {
-    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
-    const socket = io(workerUrl, {
-      auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
-    });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setStatus("connecting");
-      socket.emit("start_session", { sessionId });
-    });
-
-    socket.on("connection_status", (data: { sessionId: string; status: string }) => {
-      if (data.sessionId === sessionId) {
-        setStatus(data.status);
+    let mounted = true;
+    const poll = async () => {
+      if (!mounted) return;
+      const res = await getWhatsAppStatus(sessionId);
+      if (res.success && res.data) {
+        setStatus(res.data.status);
+      } else {
+        setStatus("disconnected");
       }
-    });
+      setTimeout(poll, 5000);
+    };
+    poll();
+    return () => { mounted = false; };
+  }, [sessionId]);
 
-    socket.on("whatsapp_message", async (data: { sessionId: string; message: any }) => {
-      if (data.sessionId === sessionId) {
-        const msg = data.message;
-        const rawJid = msg.key.remoteJid;
-        const fromMe = msg.key.fromMe;
-        
-        if (!rawJid || rawJid.includes("@g.us")) return; // Skip groups
-        
-        const phoneNumber = rawJid.split("@")[0];
-        const content = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-
-        if (!content) return;
-
-        // Save to Supabase (if not from me, because we save outbound directly)
-        if (!fromMe) {
-          await saveMessage(sessionId, phoneNumber, "inbound", content);
-          
-          // If currently viewing this customer, update state
-          if (selectedCustomer && selectedCustomer.phone && selectedCustomer.phone.endsWith(phoneNumber.slice(-9))) {
-            setMessages((prev) => [...prev, { direction: "inbound", content, created_at: new Date().toISOString() }]);
+  // Subscribe to new incoming messages via Supabase Realtime
+  useEffect(() => {
+    const channel = supabase.channel('realtime_messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'mpato_whatsapp_messages',
+        filter: `store_id=eq.${sessionId}`
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        // If we are currently viewing the customer who sent/received this message
+        const currentCustomer = selectedCustomerRef.current;
+        if (currentCustomer && currentCustomer.phone && newMsg.phone_number) {
+          if (currentCustomer.phone.endsWith(newMsg.phone_number.slice(-9)) || newMsg.phone_number.endsWith(currentCustomer.phone.slice(-9))) {
+            // Check if it's already in our state to prevent duplicates (since we add outbound optimistically)
+            setMessages((prev) => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
           }
         }
-      }
-    });
-
-    socket.on("message_sent", async (data: { sessionId: string; to: string; text: string; success: boolean, error?: string }) => {
-      if (data.sessionId === sessionId) {
-        if (!data.success) {
-          alert("Failed to send message: " + data.error);
-          return;
-        }
-
-        const phoneNumber = data.to.split("@")[0];
-        
-        await saveMessage(sessionId, phoneNumber, "outbound", data.text);
-        
-        const currentCustomer = selectedCustomerRef.current;
-        if (currentCustomer && currentCustomer.phone && currentCustomer.phone.endsWith(phoneNumber.slice(-9))) {
-          setMessages((prev) => [...prev, { direction: "outbound", content: data.text, created_at: new Date().toISOString() }]);
-        }
-      }
-    });
+      })
+      .subscribe();
 
     return () => {
-      socket.disconnect();
+      supabase.removeChannel(channel);
     };
   }, [sessionId]);
 
@@ -115,9 +100,9 @@ export function Messages({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !selectedCustomer || !socketRef.current) return;
+    if (!inputValue.trim() || !selectedCustomer) return;
 
     let to = selectedCustomer.phone?.replace(/\D/g, "") || "";
     if (to.startsWith("0")) {
@@ -131,8 +116,19 @@ export function Messages({
       return;
     }
 
-    socketRef.current.emit("send_message", { sessionId, to, text: inputValue });
+    const textToSend = inputValue;
     setInputValue("");
+    
+    // Optimistic UI update
+    const optimisticMsg = { direction: "outbound", content: textToSend, created_at: new Date().toISOString(), id: "temp-" + Date.now() };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    const res = await sendWhatsAppMessage(sessionId, to, textToSend);
+    if (!res.success) {
+      alert("Failed to send message: " + res.error);
+      // Revert optimistic update on failure
+      setMessages((prev) => prev.filter(m => m.id !== optimisticMsg.id));
+    }
   };
 
   return (

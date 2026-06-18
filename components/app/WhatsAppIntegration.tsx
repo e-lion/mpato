@@ -1,73 +1,65 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
 import { Icon } from './Icon';
 import { Btn } from './primitives';
+import { startWhatsAppSession, getWhatsAppStatus, logoutWhatsAppSession, sendWhatsAppMessage } from '@/app/actions/whatsapp';
 
 export function WhatsAppIntegration({ storeId }: { storeId?: string }) {
   const [status, setStatus] = useState<'initializing' | 'disconnected' | 'connecting' | 'qr_ready' | 'connected' | 'logged_out'>('initializing');
   const [qrCode, setQrCode] = useState<string | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fallback if no store ID is available
   const sessionId = storeId || 'test-session-123';
 
   useEffect(() => {
-    const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || 'https://wa.novaworks.pro';
-    const socket = io(workerUrl, {
-      auth: { token: process.env.NEXT_PUBLIC_GATEWAY_API_KEY }
-    });
-    socketRef.current = socket;
+    let mounted = true;
 
-    socket.on('connect', () => {
-      setStatus('disconnected');
-      socket.emit('start_session', { sessionId });
-    });
-
-    socket.on('qr', (data: { sessionId: string, qr: string }) => {
-      if (data.sessionId === sessionId) {
-        setQrCode(data.qr);
-        setStatus('qr_ready');
+    const init = async () => {
+      setStatus('connecting');
+      const resStart = await startWhatsAppSession(sessionId);
+      if (!resStart.success) {
+        console.error("Failed to start session on init:", resStart.error);
       }
-    });
-
-    socket.on('connection_status', (data: { sessionId: string, status: string }) => {
-      if (data.sessionId === sessionId) {
-        setStatus(data.status as any);
-        if (data.status === 'connected') {
-          setQrCode(null);
+      
+      const poll = async () => {
+        if (!mounted) return;
+        const res = await getWhatsAppStatus(sessionId);
+        
+        if (res.success && res.data) {
+          const s = res.data.status;
+          setStatus(s as any);
+          if (s === 'connecting') {
+            setQrCode(res.data.qr || null);
+          } else if (s === 'connected' || s === 'disconnected' || s === 'logged_out') {
+            setQrCode(null);
+          }
         }
-      }
-    });
+        
+        // Always continue polling to keep status up to date
+        pollingRef.current = setTimeout(poll, 3000);
+      };
+      
+      poll();
+    };
 
-    socket.on('message_sent', (data: { sessionId: string, success: boolean, error?: string }) => {
-      if (data.sessionId === sessionId) {
-        if (data.success) {
-          alert('Message sent successfully!');
-        } else {
-          alert(`Failed to send message: ${data.error}`);
-        }
-      }
-    });
-
-    socket.on('disconnect', () => {
-      setStatus('disconnected');
-    });
+    init();
 
     return () => {
-      socket.disconnect();
+      mounted = false;
+      if (pollingRef.current) clearTimeout(pollingRef.current);
     };
-  }, []);
+  }, [sessionId]);
 
-  const handleTestMessage = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTestMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const rawTo = formData.get('to') as string;
     const text = formData.get('text') as string;
 
-    if (!rawTo || !text || !socketRef.current) return;
+    if (!rawTo || !text) return;
 
     let to = rawTo.replace(/\D/g, "");
     if (to.startsWith("0")) {
@@ -81,15 +73,19 @@ export function WhatsAppIntegration({ storeId }: { storeId?: string }) {
       return;
     }
 
-    socketRef.current.emit('send_message', { sessionId, to, text });
-    e.currentTarget.reset();
+    const res = await sendWhatsAppMessage(sessionId, to, text);
+    if (res.success) {
+      alert('Message sent successfully!');
+      e.currentTarget.reset();
+    } else {
+      alert(`Failed to send message: ${res.error}`);
+    }
   };
 
-  const handleDisconnect = () => {
-    if (socketRef.current) {
-      setStatus('disconnected'); // Optimistic update
-      socketRef.current.emit('logout_session', { sessionId });
-    }
+  const handleDisconnect = async () => {
+    setStatus('disconnected'); // Optimistic update
+    await logoutWhatsAppSession(sessionId);
+    setQrCode(null);
   };
 
   return (
@@ -136,9 +132,22 @@ export function WhatsAppIntegration({ storeId }: { storeId?: string }) {
         <span style={{ fontWeight: 600, fontSize: 14, textTransform: "capitalize", color: "var(--fg1)" }}>
           {status.replace('_', ' ')}
         </span>
+        
+        {(status === 'disconnected' || status === 'logged_out') && (
+          <Btn variant="secondary" onClick={async () => {
+            setStatus('connecting');
+            const res = await startWhatsAppSession(sessionId);
+            if (!res.success) {
+              alert("Failed to start session: " + res.error);
+              setStatus('disconnected');
+            }
+          }}>
+            Connect
+          </Btn>
+        )}
       </div>
 
-      {status === 'qr_ready' && qrCode && (
+      {qrCode && (status === 'qr_ready' || status === 'connecting') && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 20, border: "2px dashed var(--border-strong)", borderRadius: "var(--r-md)", background: "var(--stone-50)", marginBottom: 20 }}>
           <div style={{ padding: 10, background: "#fff", borderRadius: 8, border: "1px solid var(--border)" }}>
             <QRCodeSVG value={qrCode} size={200} />
