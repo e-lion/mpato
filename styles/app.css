@@ -368,7 +368,7 @@ body {
   .topbar-title { min-width: 0; }
   .topbar h1 { font-size: 18px; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar .sub { display: none; }
-  .topsearch { display: none; }
+  .topbar .topsearch { display: none; }
   .topbar-cta { width: 40px; padding: 0; flex: none; }
   .topbar-cta .lbl { display: none; }
 
@@ -481,4 +481,14 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
   .content .tbl-lines td, .content .tbl-lines tr, .content .tbl-lines tbody { min-width: 0; max-width: 100%; }
   .content .tbl-lines td select, .content .tbl-lines td input { min-width: 0; width: 100%; }
   .tbl-lines .td-product > div { min-width: 0; }
+}
+
+/* ---------- Card toolbars (search + actions) on phones ---------- */
+@media (max-width: 760px) {
+  .content .toolbar { flex-direction: column; align-items: stretch; gap: 14px; padding: 16px !important; }
+  .content .toolbar .topsearch { width: 100% !important; height: 44px !important; }
+  .content .toolbar .topsearch input { font-size: 16px; }
+  .content .toolbar-actions { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px !important; }
+  .content .toolbar-actions .btn { height: 44px; padding: 0 12px; min-width: 0; }
+  .content .toolbar-actions .toolbar-primary { grid-column: 1 / -1; }
 }

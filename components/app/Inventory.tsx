@@ -58,10 +58,10 @@ export function Inventory({ products }: { products: Product[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <div
-          className="section-h"
+          className="section-h toolbar"
           style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", marginBottom: 0 }}
         >
-          <div className="topsearch" style={{ width: 280, height: 38 }}>
+          <div className="topsearch toolbar-search" style={{ width: 280, height: 38 }}>
             <Icon name="search" size={16} />
             <input
               placeholder="Search inventory…"
@@ -69,7 +69,7 @@ export function Inventory({ products }: { products: Product[] }) {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="toolbar-actions" style={{ display: "flex", gap: 10 }}>
             <Btn
               variant="secondary"
               icon="receipt"
@@ -86,7 +86,7 @@ export function Inventory({ products }: { products: Product[] }) {
             >
               {isPendingNav && navTarget === "/inventory/receive" ? "Loading…" : "Receive stock"}
             </Btn>
-            <Btn variant="primary" icon="plus" onClick={() => setForm({ kind: "create" })}>
+            <Btn variant="primary" icon="plus" className="toolbar-primary" onClick={() => setForm({ kind: "create" })}>
               Add product
             </Btn>
           </div>
