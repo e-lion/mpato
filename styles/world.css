@@ -350,3 +350,12 @@
   font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700;
 }
 .world3d-pop.out { color: var(--ember, #ff3522); }
+
+/* Dialogs opened from inside a drawer stay inside it, so the scene keeps playing the payoff. */
+.world-drawer .scrim,
+.world-drawer .m-scrim {
+  position: absolute; inset: 0; z-index: 5;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, .78);
+}
+.world-drawer .modal { width: min(380px, 90%); box-shadow: var(--shadow-lg); }
