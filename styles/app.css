@@ -442,8 +442,8 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
 
 @media (max-width: 760px) {
   /* Wide tables scroll inside their card instead of spilling past the page. */
-  .content .card:has(> .tbl) { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-  .content .card:has(> .tbl) .tbl { min-width: 560px; }
+  .content .card:has(> .tbl):not(.lines-card) { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .content .card:has(> .tbl):not(.lines-card) .tbl { min-width: 560px; }
   .content td input:not([type="checkbox"]):not([type="radio"]) { height: 44px; font-size: 16px; }
   /* Date and text fields never exceed their grid cell. */
   .content input, .content select, .content textarea { max-width: 100%; }
@@ -478,5 +478,7 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
   .tbl-lines .td-total::before { margin: 0; font-family: var(--font-sans); }
   .tbl-lines .td-remove { position: absolute; top: 14px; right: 12px; }
   .tbl-lines .td-remove button { width: 36px; height: 36px; display: grid; place-items: center; }
-  .tbl-lines .td-product select { min-width: 0; }
+  .content .tbl-lines td, .content .tbl-lines tr, .content .tbl-lines tbody { min-width: 0; max-width: 100%; }
+  .content .tbl-lines td select, .content .tbl-lines td input { min-width: 0; width: 100%; }
+  .tbl-lines .td-product > div { min-width: 0; }
 }
