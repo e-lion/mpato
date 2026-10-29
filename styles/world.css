@@ -410,3 +410,46 @@
 @media (max-width: 899px) {
   @keyframes world-drawer-in { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
 }
+
+/* day ticks under the 3D bar board */
+.world3d-tick { pointer-events: none; font-size: 10.5px; font-weight: 700; color: var(--fg3); }
+
+/* ---------- in-world rooms (dashboard / inventory / suppliers / customers) ---------- */
+.room { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.room-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--white); }
+.room-kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.room-kpis > div { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; justify-content: center; }
+.room-kpis > div + div, .room-kpis > button + div, .room-kpis > div + button { border-left: 1px solid var(--border); }
+.room-kpis b { font-family: var(--font-display); font-size: 17px; font-weight: 800; color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-kpis span { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--fg3); }
+.room-kpis .warn b { color: var(--warning-fg); }
+.room-cta { display: flex; align-items: center; justify-content: center; gap: 8px; border: none; background: var(--rose-50); color: var(--rose-700); font-weight: 700; font-size: 13px; cursor: pointer; border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 12px; }
+.room-cta:hover { background: var(--rose-100); }
+.room-h { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--fg1); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.room-h small { font-family: var(--font-sans); font-weight: 500; font-size: 12px; color: var(--fg3); }
+.room-bar { display: flex; gap: 10px; align-items: center; }
+.room-bar .room-search { flex: 1; width: auto; min-width: 0; height: 44px; }
+.room-bar .btn { height: 44px; flex: none; }
+.room-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.room-days button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 2px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--white); cursor: pointer; font-size: 11px; color: var(--fg3); font-weight: 700; transition: background var(--transition), border-color var(--transition); }
+.room-days button b { font-size: 12.5px; color: var(--fg1); }
+.room-days button:hover, .room-days button.on { background: var(--rose-50); border-color: var(--rose-200); }
+.room-list { display: flex; flex-direction: column; gap: 8px; }
+.room-row { display: flex; align-items: center; gap: 10px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--white); transition: background var(--transition), border-color var(--transition); }
+button.room-row { width: 100%; text-align: left; cursor: pointer; padding: 10px 12px; font: inherit; }
+.room-row.static { padding: 10px 12px; }
+.room-row.on { background: var(--rose-50); border-color: var(--rose-200); }
+button.room-row:hover:not(:disabled) { background: var(--stone-50); }
+button.room-row:disabled { opacity: .6; cursor: default; }
+.room-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 52px; padding: 6px 8px; border: none; background: none; text-align: left; cursor: pointer; font: inherit; border-radius: var(--r-md); }
+.room-edit { width: 40px; height: 40px; border: none !important; background: none !important; flex: none; }
+.room-ic { width: 36px; height: 36px; flex: none; border-radius: var(--r-sm); background: var(--stone-100); color: var(--fg2); display: grid; place-items: center; }
+.room-t { flex: 1; min-width: 0; }
+.room-t .nm { font-weight: 600; font-size: 14px; color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-t .sub { font-size: 12.5px; color: var(--fg3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-empty { padding: 18px 12px; text-align: center; color: var(--fg3); font-size: 13.5px; grid-column: 1 / -1; }
+.world-drawer-link { color: var(--fg3); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 640px) {
+  .room { padding: 0 0 4px; }
+  .room-days { gap: 4px; }
+}

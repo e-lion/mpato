@@ -8,8 +8,9 @@ import { PAL } from "./palette";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
 import type { WorldEvent } from "./types";
-import type { SaleSceneEvent, DeliverySceneEvent } from "./bus";
+import type { SaleSceneEvent, DeliverySceneEvent, RoomSceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
+import { RoomScene } from "./roomScene";
 import { Tweens, easeSmooth } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { preloadCharacter } from "./assets";
@@ -74,6 +75,7 @@ export class WorldEngine {
   private interior: Interior | null = null;
   private saleScene: SaleScene | null = null;
   private deliveryScene: DeliveryScene | null = null;
+  private roomScene: RoomScene | null = null;
   private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private inset = { right: 0, bottom: 0 };
   /** Where the (animated) inset is heading; framing maths uses this, not the in-flight value. */
@@ -257,6 +259,12 @@ export class WorldEngine {
     this.markDirty();
   }
 
+  /** Forward dashboard / inventory / customers drawer events to the room choreography. */
+  roomEvent(e: RoomSceneEvent) {
+    this.roomScene?.handle(e);
+    this.markDirty();
+  }
+
   private setShopsHidden(hidden: boolean, only?: string) {
     for (const [sid, node] of this.shops) {
       if (only && sid !== only) continue;
@@ -310,6 +318,7 @@ export class WorldEngine {
     if (!pos) return;
     this.saleScene?.dispose();
     this.deliveryScene?.dispose();
+    this.roomScene?.dispose();
     this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     this.focusId = id;
     this.setShopsHidden(true, id);
@@ -325,6 +334,7 @@ export class WorldEngine {
     this.scene.add(this.interior.group);
     this.saleScene = new SaleScene(this.interior, this.tweens, () => this.markDirty());
     this.deliveryScene = new DeliveryScene(this.interior, this.tweens, () => this.markDirty());
+    this.roomScene = new RoomScene(this.interior, this.tweens, () => this.markDirty());
 
     const target = pos.clone().add(new THREE.Vector3(0, 0.7, 0.9));
     // Pull back far enough that the whole shop fits in the part of the screen the drawer leaves free.
@@ -358,6 +368,8 @@ export class WorldEngine {
     this.saleScene = null;
     this.deliveryScene?.dispose();
     this.deliveryScene = null;
+    this.roomScene?.dispose();
+    this.roomScene = null;
     this.tweens.clear();
     const room = this.interior;
     this.interior = null;
@@ -394,6 +406,7 @@ export class WorldEngine {
     cancelAnimationFrame(this.raf);
     this.saleScene?.dispose();
     this.deliveryScene?.dispose();
+    this.roomScene?.dispose();
     this.tweens.clear();
     this.resizeObs.disconnect();
     const dom = this.renderer.domElement;

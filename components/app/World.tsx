@@ -4,16 +4,26 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { setActiveStore } from "@/app/actions/active-store";
+import Link from "next/link";
 import {
   loadPosForWorld,
   loadReceiveForWorld,
+  loadDashboardForWorld,
+  loadInventoryForWorld,
+  loadSuppliersForWorld,
+  loadCustomersForWorld,
   getWalletKES,
   type PosDrawerData,
   type ReceiveDrawerData,
+  type DashboardRoomData,
+  type InventoryRoomData,
+  type SuppliersRoomData,
+  type CustomersRoomData,
 } from "@/app/actions/world";
+import { DashboardRoom, InventoryRoom, SuppliersRoom, CustomersRoom } from "./WorldRooms";
 import { POS } from "./POS";
 import { ReceiveStock } from "./ReceiveStock";
-import type { SaleSceneEvent, DeliverySceneEvent } from "./world/bus";
+import type { SaleSceneEvent, DeliverySceneEvent, RoomSceneEvent } from "./world/bus";
 import { canAccess } from "@/lib/auth/access";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
@@ -24,6 +34,25 @@ type EngineType = import("./world/engine").WorldEngine;
 type PickInfo = { amountKES: number; method?: "mpesa" | "cash" };
 
 // Actions on a selected shop → the real tools, gated per-store by role.
+type RoomKind = "pos" | "receive" | "dashboard" | "inventory" | "suppliers" | "customers";
+// Paths that open as an in-scene room (with the shop animating around the data); the rest still navigate.
+const ROOM_FOR: Record<string, RoomKind> = {
+  "/dashboard": "dashboard",
+  "/pos": "pos",
+  "/inventory": "inventory",
+  "/inventory/receive": "receive",
+  "/suppliers": "suppliers",
+  "/customers": "customers",
+};
+const ROOM_META: Record<RoomKind, { title: string; path: string }> = {
+  pos: { title: "Point of sale", path: "/pos" },
+  receive: { title: "Receive stock", path: "/inventory/receive" },
+  dashboard: { title: "Dashboard", path: "/dashboard" },
+  inventory: { title: "Inventory", path: "/inventory" },
+  suppliers: { title: "Suppliers", path: "/suppliers" },
+  customers: { title: "Customers", path: "/customers" },
+};
+
 const ACTIONS: { path: string; label: string; icon: string }[] = [
   { path: "/dashboard", label: "Dashboard", icon: "layout-dashboard" },
   { path: "/pos", label: "Point of sale", icon: "shopping-cart" },
@@ -53,7 +82,11 @@ export function World({
   // Shop we're standing inside + its POS data (null data = still loading).
   type Room =
     | { kind: "pos"; storeId: string; data: PosDrawerData | null }
-    | { kind: "receive"; storeId: string; data: ReceiveDrawerData | null };
+    | { kind: "receive"; storeId: string; data: ReceiveDrawerData | null }
+    | { kind: "dashboard"; storeId: string; data: DashboardRoomData | null }
+    | { kind: "inventory"; storeId: string; data: InventoryRoomData | null }
+    | { kind: "suppliers"; storeId: string; data: SuppliersRoomData | null }
+    | { kind: "customers"; storeId: string; data: CustomersRoomData | null };
   const [room, setRoom] = useState<Room | null>(null);
   const [walletMap, setWalletMap] = useState<Record<string, number>>(wallets);
 
@@ -117,21 +150,33 @@ export function World({
       : { right: Math.min(980, Math.round(w * 0.56)), bottom: 0 };
   }, []);
 
-  const openRoom = useCallback(async (storeId: string, kind: "pos" | "receive") => {
+  const openRoom = useCallback(async (storeId: string, kind: RoomKind) => {
     setSelectedId(null);
     setRoom({ kind, storeId, data: null } as Room);
     // Set the dock inset first so the fly-in frames the shop in the free area.
     const ins = insetFor();
     engineRef.current?.setInset(ins.right, ins.bottom);
     engineRef.current?.focusShop(storeId);
-    if (kind === "pos") {
-      const data = await loadPosForWorld(storeId);
-      setRoom((r) => (r && r.storeId === storeId && r.kind === "pos" ? { kind, storeId, data } : r));
-    } else {
-      const data = await loadReceiveForWorld(storeId);
-      setRoom((r) => (r && r.storeId === storeId && r.kind === "receive" ? { kind, storeId, data } : r));
-    }
+    const loaders = {
+      pos: loadPosForWorld,
+      receive: loadReceiveForWorld,
+      dashboard: loadDashboardForWorld,
+      inventory: loadInventoryForWorld,
+      suppliers: loadSuppliersForWorld,
+      customers: loadCustomersForWorld,
+    } as const;
+    const data = await loaders[kind](storeId);
+    // only apply if the user is still in this very room
+    setRoom((r) => (r && r.storeId === storeId && r.kind === kind ? ({ kind, storeId, data } as Room) : r));
   }, []);
+
+  // Re-fetch a room's data after a form saves; resolves with the fresh list so the room can react.
+  const refreshRoom = useCallback(async <T,>(storeId: string, kind: RoomKind, load: (id: string) => Promise<T>) => {
+    const data = await load(storeId);
+    setRoom((r) => (r && r.storeId === storeId && r.kind === kind ? ({ kind, storeId, data } as Room) : r));
+    return data;
+  }, []);
+  const roomEvent = useCallback((e: RoomSceneEvent) => engineRef.current?.roomEvent(e), []);
 
   const leaveRoom = useCallback(() => {
     sale({ type: "leave" });
@@ -278,14 +323,19 @@ export function World({
       {toast && <div className="world-toast">{toast}</div>}
 
       {room && (
-        <aside
-          className="world-drawer"
-          aria-label={room.kind === "pos" ? "Point of sale" : "Receive stock"}
-        >
+        <aside className="world-drawer" aria-label={ROOM_META[room.kind].title}>
           <div className="world-drawer-h">
             <div>
-              <h3>{room.kind === "pos" ? "Point of sale" : "Receive stock"}</h3>
-              <div className="area">{stores.find((s) => s.storeId === room.storeId)?.name}</div>
+              <h3>{ROOM_META[room.kind].title}</h3>
+              <div className="area">
+                {stores.find((s) => s.storeId === room.storeId)?.name}
+                {room.kind !== "pos" && room.kind !== "receive" && (
+                  <>
+                    {" · "}
+                    <Link className="world-drawer-link" href={ROOM_META[room.kind].path}>Full page</Link>
+                  </>
+                )}
+              </div>
             </div>
             <div className="world-drawer-end">
               <span className="world-wallet" title="Shop wallet: sales in, supplier payments out">
@@ -315,6 +365,43 @@ export function World({
                 suppliers={room.data.suppliers}
                 recentReceipts={room.data.recentReceipts}
                 onWorld={delivery}
+              />
+            )}
+            {room.kind === "dashboard" && room.data?.ok && (
+              <DashboardRoom data={room.data} emit={roomEvent} sale={sale} />
+            )}
+            {room.kind === "inventory" && room.data?.ok && (
+              <InventoryRoom
+                products={room.data.products}
+                emit={roomEvent}
+                reload={async () => {
+                  const d = await refreshRoom(room.storeId, "inventory", loadInventoryForWorld);
+                  return d.ok ? d.products.length : 0;
+                }}
+              />
+            )}
+            {room.kind === "suppliers" && room.data?.ok && (
+              <SuppliersRoom
+                suppliers={room.data.suppliers}
+                delivery={delivery}
+                reload={async () => {
+                  const d = await refreshRoom(room.storeId, "suppliers", loadSuppliersForWorld);
+                  return d.ok ? d.suppliers : null;
+                }}
+                onReceive={() => {
+                  delivery({ type: "leave" });
+                  openRoom(room.storeId, "receive");
+                }}
+              />
+            )}
+            {room.kind === "customers" && room.data?.ok && (
+              <CustomersRoom
+                customers={room.data.customers}
+                emit={roomEvent}
+                reload={async () => {
+                  const d = await refreshRoom(room.storeId, "customers", loadCustomersForWorld);
+                  return d.ok ? d.customers : null;
+                }}
               />
             )}
           </div>
@@ -359,11 +446,9 @@ export function World({
                 key={a.path}
                 type="button"
                 onClick={() =>
-                  a.path === "/pos"
-                    ? openRoom(selected.storeId, "pos")
-                    : a.path === "/inventory/receive"
-                      ? openRoom(selected.storeId, "receive")
-                      : navTo(selected.storeId, a.path)
+                  ROOM_FOR[a.path]
+                    ? openRoom(selected.storeId, ROOM_FOR[a.path])
+                    : navTo(selected.storeId, a.path)
                 }
                 disabled={pending}
               >
