@@ -11,6 +11,7 @@ import { TILES } from "@/lib/mockData";
 import type { Product } from "@/lib/data/types";
 import type { StockReceiptListItem, Supplier } from "@/lib/data/queries";
 import { receiveStock } from "@/app/actions/stock-receipts";
+import type { DeliverySceneEvent } from "./world/bus";
 
 type Line = {
   // Stable key for the row even before a product is picked.
@@ -39,10 +40,13 @@ export function ReceiveStock({
   products,
   suppliers,
   recentReceipts,
+  onWorld,
 }: {
   products: Product[];
   suppliers: Supplier[];
   recentReceipts: StockReceiptListItem[];
+  /** Set when embedded in the 3D world: reports supplier/receipt so the scene can act them out. */
+  onWorld?: (e: DeliverySceneEvent) => void;
 }) {
   const router = useRouter();
   const [supplierId, setSupplierId] = useState<string>("");
@@ -96,6 +100,7 @@ export function ReceiveStock({
     ]);
 
   const reset = () => {
+    onWorld?.({ type: "supplier", name: null });
     setSupplierId("");
     setDeliveryDate(todayISO());
     setReference("");
@@ -140,6 +145,7 @@ export function ReceiveStock({
         setError(result.error);
         return;
       }
+      onWorld?.({ type: "received", lines: result.lineCount, paid: Number(amountPaid) || 0 });
       setSuccess({
         receiptNo: result.receiptNo,
         total: Math.round(result.totalCents / 100),
@@ -157,7 +163,7 @@ export function ReceiveStock({
         <Link
           href="/inventory"
           style={{
-            display: "inline-flex",
+            display: onWorld ? "none" : "inline-flex",
             alignItems: "center",
             gap: 6,
             color: "var(--fg3)",
@@ -222,7 +228,7 @@ export function ReceiveStock({
         <Link
           href="/inventory"
           style={{
-            display: "inline-flex",
+            display: onWorld ? "none" : "inline-flex",
             alignItems: "center",
             gap: 6,
             color: "var(--fg3)",
@@ -251,7 +257,13 @@ export function ReceiveStock({
                 <select
                   id="rs-supplier"
                   value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
+                  onChange={(e) => {
+                    setSupplierId(e.target.value);
+                    onWorld?.({
+                      type: "supplier",
+                      name: suppliers.find((s) => s.id === e.target.value)?.name ?? null,
+                    });
+                  }}
                   style={{ flex: 1 }}
                 >
                   <option value="">Walk-in / cash-and-carry</option>
@@ -684,9 +696,11 @@ export function ReceiveStock({
               <Btn variant="secondary" block onClick={reset}>
                 Log another
               </Btn>
-              <Btn variant="primary" block icon="package" onClick={() => router.push("/inventory")}>
-                Back to inventory
-              </Btn>
+              {!onWorld && (
+                <Btn variant="primary" block icon="package" onClick={() => router.push("/inventory")}>
+                  Back to inventory
+                </Btn>
+              )}
             </div>
           </div>
         </div>

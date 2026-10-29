@@ -9,7 +9,7 @@ import {
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-const PROTECTED = ["/dashboard", "/pos", "/inventory", "/customers", "/messages", "/suppliers", "/reports", "/storefront", "/staff", "/settings"];
+const PROTECTED = ["/dashboard", "/world", "/pos", "/inventory", "/customers", "/messages", "/suppliers", "/reports", "/storefront", "/staff", "/settings"];
 const AUTH_PAGES = ["/login", "/signup", "/join"];
 
 export async function updateSession(request: NextRequest) {

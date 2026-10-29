@@ -28,6 +28,8 @@ export type RecentSale = {
   total: number;
   method: "mpesa" | "cash";
   time: string;
+  /** ISO timestamp — for ordering/interleaving sales with other events. */
+  at: string;
   cashier: string;
 };
 

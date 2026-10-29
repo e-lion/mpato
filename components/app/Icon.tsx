@@ -1,13 +1,14 @@
 import {
-  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Banknote, BarChart3, Bell, Box,
-  Candy, Check, ChevronDown, ChevronsUpDown, Cookie, CupSoda, Download, Droplet, Ellipsis,
-  Filter, Flame, LayoutDashboard, Leaf, LogOut, Milk, Minus, Package, Pencil, PlayCircle, Plus,
+  AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Banknote, BarChart3, Bell, Box,
+  Boxes, Candy, Check, ChevronDown, ChevronsUpDown, Cookie, CupSoda, Download, Droplet, Ellipsis,
+  Filter, Flame, LayoutDashboard, Leaf, LocateFixed, LogOut, Map, Milk, Minus, Package, Pencil, PlayCircle, Plus,
   Printer, Receipt, Sandwich, Search, Send, Settings, ShoppingCart, Smartphone,
-  Sparkles, Store, Trash2, TrendingUp, Truck, UserPlus, UserRound, Users, Wheat, X, Zap,
+  Sparkles, Store, Trash2, TrendingUp, Truck, UserPlus, UserRound, Users, Wallet, Wheat, X, Zap,
   type LucideIcon,
 } from "lucide-react";
 
 const MAP: Record<string, LucideIcon> = {
+  "alert-triangle": AlertTriangle,
   "arrow-down-right": ArrowDownRight,
   "arrow-left": ArrowLeft,
   "arrow-right": ArrowRight,
@@ -16,6 +17,7 @@ const MAP: Record<string, LucideIcon> = {
   "bar-chart-3": BarChart3,
   bell: Bell,
   box: Box,
+  boxes: Boxes,
   candy: Candy,
   check: Check,
   "chevron-down": ChevronDown,
@@ -29,7 +31,10 @@ const MAP: Record<string, LucideIcon> = {
   flame: Flame,
   "layout-dashboard": LayoutDashboard,
   leaf: Leaf,
+  "locate-fixed": LocateFixed,
+  wallet: Wallet,
   "log-out": LogOut,
+  map: Map,
   milk: Milk,
   minus: Minus,
   package: Package,
