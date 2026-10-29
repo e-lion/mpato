@@ -130,96 +130,77 @@ export function Messages({
     }
   };
 
+  const initial = (n: string) => n.charAt(0).toUpperCase();
+
   return (
-    <div className="page-w" style={{ display: "flex", gap: 20, height: "80vh" }}>
-      {/* Sidebar: Customers List */}
-      <div className="card" style={{ width: 320, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: 16, borderBottom: "1px solid var(--border)", background: "var(--stone-50)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--fg1)" }}>Messages</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, color: "var(--fg3)", textTransform: "capitalize" }}>{status.replace("_", " ")}</span>
-            <div style={{ 
-              width: 10, height: 10, borderRadius: "50%", 
-              background: status === "connected" ? "var(--success-fg)" : "var(--rose-600)"
-            }} title={status} />
+    <div className={"msg-shell" + (selectedCustomer ? " has-chat" : "")}>
+      {/* Customer list */}
+      <section className="card msg-list" aria-label="Conversations">
+        <div className="msg-list-h">
+          <h2>Messages</h2>
+          <div className="msg-status">
+            <span>{status.replace("_", " ")}</span>
+            <i className={status === "connected" ? "on" : ""} title={status} />
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div className="msg-list-body">
           {customers.map((c) => (
             <button
               key={c.id}
+              type="button"
               onClick={() => setSelectedCustomer(c)}
-              style={{
-                width: "100%", textAlign: "left", padding: "14px 16px",
-                borderBottom: "1px solid var(--border)",
-                background: selectedCustomer?.id === c.id ? "var(--rose-50)" : "transparent",
-                border: "none", cursor: "pointer", display: "flex", gap: 12, alignItems: "center"
-              }}
+              className={"msg-row" + (selectedCustomer?.id === c.id ? " active" : "")}
             >
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--stone-200)", display: "grid", placeItems: "center", color: "var(--fg2)", fontWeight: 600 }}>
-                {c.name.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--fg1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                <div style={{ fontSize: 12, color: "var(--fg3)", marginTop: 2 }}>{c.phone || "No phone"}</div>
+              <div className="msg-av">{initial(c.name)}</div>
+              <div className="msg-row-t">
+                <div className="nm">{c.name}</div>
+                <div className="ph">{c.phone || "No phone"}</div>
               </div>
             </button>
           ))}
-          {customers.length === 0 && (
-            <div style={{ padding: 20, textAlign: "center", color: "var(--fg3)", fontSize: 14 }}>
-              No customers found.
-            </div>
-          )}
+          {customers.length === 0 && <div className="msg-empty">No customers found.</div>}
         </div>
-      </div>
+      </section>
 
-      {/* Main Chat Area */}
-      <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Conversation */}
+      <section className="card msg-chat" aria-label="Conversation">
         {selectedCustomer ? (
           <>
-            <div style={{ padding: 16, borderBottom: "1px solid var(--border)", background: "var(--stone-50)", display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--stone-200)", display: "grid", placeItems: "center", color: "var(--fg2)", fontWeight: 600 }}>
-                {selectedCustomer.name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--fg1)" }}>{selectedCustomer.name}</h3>
-                <div style={{ fontSize: 13, color: "var(--fg3)", marginTop: 2 }}>{selectedCustomer.phone}</div>
+            <div className="msg-chat-h">
+              <button
+                type="button"
+                className="msg-back"
+                aria-label="Back to conversations"
+                onClick={() => setSelectedCustomer(null)}
+              >
+                <Icon name="arrow-left" size={18} />
+              </button>
+              <div className="msg-av">{initial(selectedCustomer.name)}</div>
+              <div className="msg-row-t">
+                <h3>{selectedCustomer.name}</h3>
+                <div className="ph">{selectedCustomer.phone}</div>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 12, background: "#f0f2f5" }}>
+            <div className="msg-thread">
               {messages.length === 0 ? (
-                <div style={{ textAlign: "center", color: "var(--fg3)", margin: "auto", fontSize: 14 }}>
+                <div className="msg-empty-thread">
                   No messages yet. Send a message to start the conversation!
                 </div>
               ) : (
-                messages.map((m, i) => {
-                  const isOutbound = m.direction === "outbound";
-                  return (
-                    <div key={i} style={{ display: "flex", justifyContent: isOutbound ? "flex-end" : "flex-start" }}>
-                      <div style={{
-                        maxWidth: "70%",
-                        padding: "10px 14px",
-                        borderRadius: 12,
-                        background: isOutbound ? "#dcf8c6" : "#ffffff",
-                        color: "#000",
-                        fontSize: 14,
-                        lineHeight: 1.4,
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                      }}>
-                        {m.content}
-                        <div style={{ fontSize: 10, color: "rgba(0,0,0,0.45)", textAlign: "right", marginTop: 4 }}>
-                          {relativeTime(m.created_at)}
-                        </div>
-                      </div>
+                messages.map((m, i) => (
+                  <div key={m.id ?? i} className={"msg-line" + (m.direction === "outbound" ? " out" : "")}>
+                    <div className="msg-bubble">
+                      {m.content}
+                      <div className="msg-time">{relativeTime(m.created_at)}</div>
                     </div>
-                  );
-                })
+                  </div>
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} style={{ padding: 16, borderTop: "1px solid var(--border)", display: "flex", gap: 10, background: "#fff" }}>
+            <form onSubmit={handleSendMessage} className="msg-form">
               <input
                 type="text"
                 value={inputValue}
@@ -230,7 +211,6 @@ export function Messages({
                   "Type a message..."
                 }
                 disabled={status !== "connected" || !selectedCustomer.phone}
-                style={{ flex: 1, padding: "12px 16px", borderRadius: 24, border: "1px solid var(--border)", outline: "none", fontSize: 14 }}
               />
               <Btn variant="primary" type="submit" disabled={status !== "connected" || !inputValue.trim() || !selectedCustomer.phone}>
                 Send
@@ -238,11 +218,9 @@ export function Messages({
             </form>
           </>
         ) : (
-          <div style={{ flex: 1, display: "grid", placeItems: "center", color: "var(--fg3)", fontSize: 15 }}>
-            Select a customer to start chatting
-          </div>
+          <div className="msg-empty-thread big">Select a customer to start chatting</div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
