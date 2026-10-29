@@ -148,10 +148,20 @@ export class DeliveryScene {
     // Swap in a real model if public/models/truck.glb exists.
     loadGltfScene("/models/truck.glb").then((model) => {
       if (!model || this.truck !== truck) return;
-      const alongX = fitModel(model, 3.4);
+      const alongX = fitModel(model, 3.0);
       if (!alongX) model.rotation.y = Math.PI / 2;
       truck.children.filter((c) => c.userData.proc).forEach((c) => truck.remove(c));
       truck.add(model);
+      // the real model carries its own livery, so show the supplier as a name tag
+      const el = document.createElement("div");
+      el.className = "world3d-label active";
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = name;
+      el.appendChild(nm);
+      const tag = new CSS2DObject(el);
+      tag.position.set(0, 2.1, 0);
+      truck.add(tag);
       this.dirty();
     });
     const from = truck.position.x;

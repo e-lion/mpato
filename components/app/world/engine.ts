@@ -11,6 +11,8 @@ import type { SaleSceneEvent, DeliverySceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
 import { Tweens, easeInOut as ease } from "./tween";
 import { buildInterior, type Interior } from "./interior";
+import { preloadCharacter } from "./assets";
+import { updatePeople } from "./people";
 import { SaleScene } from "./saleScene";
 
 const SP = 6; // lattice spacing between shops
@@ -160,6 +162,7 @@ export class WorldEngine {
     this.resizeObs = new ResizeObserver(() => this.onResize());
     this.resizeObs.observe(container);
 
+    void preloadCharacter(); // ready by the time the user steps into a shop
     this.clock.start();
     this.markDirty();
     this.raf = requestAnimationFrame(this.tick);
@@ -276,6 +279,9 @@ export class WorldEngine {
     this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     this.focusId = id;
     this.setShopsHidden(true);
+    // drop map-level walkers/trucks so they don't wander through the interior
+    for (const a of this.agents) this.disposeGroup(a.group);
+    this.agents = [];
 
     const store = this.stores.find((s) => s.storeId === id);
     void store;
@@ -659,6 +665,8 @@ export class WorldEngine {
     let dirty = performance.now() < this.dirtyUntil;
 
     this.controls.update();
+
+    if (updatePeople(dt)) dirty = true;
 
     if (this.tweens.active) {
       dirty = true;

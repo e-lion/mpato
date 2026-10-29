@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { getCharacter, type CharacterTemplate } from "./assets";
 
 /**
  * Articulated procedural person: hips/shoulders are pivots so legs and arms
@@ -13,7 +15,21 @@ export type Person = {
   reach: (v: number) => void;
   /** World-ish position (in the person's parent space) of the right hand. */
   handLocal: THREE.Vector3;
+  /** Per-frame update for rigged people (mixer). Procedural people don't need it. */
+  update?: (dt: number) => void;
 };
+
+const live = new Set<Person>();
+/** Advance every rigged person that's still in the scene. Returns true while any are animating. */
+export function updatePeople(dt: number) {
+  let any = false;
+  for (const p of live) {
+    if (!p.group.parent) { live.delete(p); continue; }
+    p.update?.(dt);
+    any = true;
+  }
+  return any;
+}
 
 const SKINS = ["#f1c9a5", "#d9a47c", "#a97550", "#7a4e33", "#5a3825"];
 const SHIRTS = ["#e15a3b", "#2f7d6b", "#3b6fb6", "#d9a441", "#8b5cb5", "#4b5563", "#c24d7a"];
@@ -34,7 +50,97 @@ function part(geo: THREE.BufferGeometry, m: THREE.Material) {
   return mesh;
 }
 
+/** Rigged glTF character when public/models/character.glb has loaded, else the procedural one. */
 export function makePerson(look: {
+  skin: string;
+  shirt: string;
+  pants?: string;
+  hair?: string;
+}): Person {
+  const tpl = getCharacter();
+  if (tpl) {
+    try {
+      return makeRiggedPerson(tpl, look.shirt);
+    } catch {
+      /* fall through to procedural */
+    }
+  }
+  return makeProceduralPerson(look);
+}
+
+function makeRiggedPerson(tpl: CharacterTemplate, shirt: string): Person {
+  const group = new THREE.Group();
+  const model = cloneSkinned(tpl.scene) as THREE.Group;
+  const k = 1.15 / 1.81; // character is ~1.81 m; the shop is built at toy scale
+  model.scale.multiplyScalar(k);
+  group.add(model);
+
+  // Tint the body surface per person; give each person their own materials.
+  const body = new THREE.Color(shirt);
+  model.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    const own = mats.map((mat) => {
+      const c = (mat as THREE.MeshStandardMaterial).clone();
+      if (/highlimbs|surface/i.test(c.name)) {
+        c.color.copy(body);
+        c.metalness = 0.15;
+        c.roughness = 0.55;
+      }
+      return c;
+    });
+    m.material = Array.isArray(m.material) ? own : own[0];
+  });
+
+  const mixer = new THREE.AnimationMixer(model);
+  const find = (re: RegExp) => tpl.clips.find((c) => re.test(c.name));
+  const idleClip = find(/idle/i);
+  const walkClip = find(/^walk$/i) ?? find(/walk/i);
+  const idle = idleClip ? mixer.clipAction(idleClip) : null;
+  const walk = walkClip ? mixer.clipAction(walkClip) : null;
+  idle?.play();
+  walk?.play();
+  if (walk) walk.timeScale = 2.8; // matches the shop's walking speed (~2.4 units/s)
+  if (idle) idle.time = Math.random() * idle.getClip().duration;
+  let amt = 0;
+  const setAmt = (a: number) => {
+    amt = a;
+    if (walk) walk.weight = a;
+    if (idle) idle.weight = 1 - a;
+  };
+  setAmt(0);
+
+  // Right arm override for hand-overs / waving, applied after the mixer each frame.
+  const arm = model.getObjectByName("mixamorigRightArm") ?? model.getObjectByName("RightArm");
+  const fore = model.getObjectByName("mixamorigRightForeArm") ?? model.getObjectByName("RightForeArm");
+  const armQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -1.35)); // raise forward
+  const foreQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.5));
+  let reachV = 0;
+
+  const handLocal = new THREE.Vector3();
+  const person: Person = {
+    group,
+    handLocal,
+    walk: (_phase, a) => setAmt(a),
+    reach: (v) => {
+      reachV = v;
+      handLocal.set(0.21, 0.95, 0.15 + 0.3 * v);
+    },
+    update: (dt) => {
+      mixer.update(dt);
+      if (reachV > 0.001 && arm) {
+        arm.quaternion.slerp(arm.quaternion.clone().multiply(armQ), reachV);
+        if (fore) fore.quaternion.slerp(fore.quaternion.clone().multiply(foreQ), reachV);
+      }
+      void amt;
+    },
+  };
+  live.add(person);
+  return person;
+}
+
+export function makeProceduralPerson(look: {
   skin: string;
   shirt: string;
   pants?: string;

@@ -47,3 +47,38 @@ export function fitModel(model: THREE.Object3D, length: number) {
   model.position.y -= b2.min.y;
   return size.x >= size.z; // true when the model's long axis is already x
 }
+
+// ---- rigged character template (public/models/character.glb) ----------------
+
+export type CharacterTemplate = { scene: THREE.Group; clips: THREE.AnimationClip[] };
+let character: CharacterTemplate | null = null;
+let characterLoading: Promise<void> | null = null;
+
+/** Start loading the shared character rig; resolves once (or never errors). */
+export function preloadCharacter(): Promise<void> {
+  characterLoading ??= (async () => {
+    try {
+      const head = await fetch("/models/character.glb", { method: "HEAD" });
+      const type = head.headers.get("content-type") ?? "";
+      if (!head.ok || type.includes("text/html")) return;
+      loader ??= new GLTFLoader();
+      const gltf = await loader.loadAsync("/models/character.glb");
+      gltf.scene.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+          (o as THREE.Mesh).frustumCulled = false; // skinned bounds are unreliable
+        }
+      });
+      character = { scene: gltf.scene, clips: gltf.animations };
+    } catch {
+      /* fall back to the procedural person */
+    }
+  })();
+  return characterLoading;
+}
+
+/** Sync access: null until preloadCharacter() has finished (or if the file is missing). */
+export function getCharacter(): CharacterTemplate | null {
+  return character;
+}
