@@ -38,6 +38,22 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
     setPendingHref(null);
   }, [pathname]);
 
+  // Collapsed = icon-only rail. Persisted per browser; read after mount so
+  // server and first client render agree.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("mpato.sidebar") === "collapsed");
+    } catch {}
+  }, []);
+  const toggle = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem("mpato.sidebar", c ? "expanded" : "collapsed");
+      } catch {}
+      return !c;
+    });
+
   const Item = ({ it }: { it: NavItem }) => {
     const active = pathname.startsWith(it.href);
     const pending = pendingHref === it.href && !active;
@@ -50,6 +66,8 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
           (pending ? " is-loading" : "")
         }
         aria-busy={pending || undefined}
+        aria-label={collapsed ? it.label : undefined}
+        data-tip={collapsed ? it.label : undefined}
         onClick={() => {
           if (!active) setPendingHref(it.href);
         }}
@@ -59,7 +77,7 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
         ) : (
           <Icon name={it.icon} size={18} />
         )}
-        {it.label}
+        <span className="navitem-text">{it.label}</span>
         {it.badge && <span className="badge-n">{it.badge}</span>}
       </Link>
     );
@@ -72,10 +90,20 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
   const manage = MANAGE.filter((it) => canAccess(role, it.href));
 
   return (
-    <aside className="sidebar">
+    <aside className={"sidebar" + (collapsed ? " collapsed" : "")}>
       <div className="brand">
         <img src="/logomark.svg" alt="Mpato" />
         <span className="wm">Mpato</span>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          data-tip={collapsed ? "Expand" : undefined}
+        >
+          <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={18} />
+        </button>
       </div>
       {primary.map((it) => (
         <Item key={it.href} it={it} />
