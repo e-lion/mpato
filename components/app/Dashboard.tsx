@@ -223,7 +223,7 @@ function RecentSales({ sales }: { sales: RecentSale[] }) {
       {sales.length === 0 ? (
         <div style={{ padding: "12px 20px 24px", color: "var(--fg3)", fontSize: 14 }}>No sales yet — make your first one in the point of sale.</div>
       ) : (
-        <table className="tbl">
+        <table className="tbl tbl-stack">
           <thead>
             <tr>
               <th>Receipt</th><th>Items</th><th>Method</th><th>Cashier</th><th>When</th>
@@ -234,17 +234,17 @@ function RecentSales({ sales }: { sales: RecentSale[] }) {
             {sales.map((s) => (
               <tr key={s.id}>
                 <td className="mono" style={{ fontWeight: 500 }}>#{s.receiptNo}</td>
-                <td className="num">{s.items}</td>
-                <td>
+                <td className="num" data-label="Items">{s.items}</td>
+                <td data-label="Method">
                   {s.method === "mpesa" ? (
                     <Badge kind="mpesa"><Icon name="smartphone" size={12} />M-PESA</Badge>
                   ) : (
                     <Badge kind="cash"><Icon name="banknote" size={12} />Cash</Badge>
                   )}
                 </td>
-                <td>{s.cashier}</td>
-                <td style={{ color: "var(--fg3)" }}>{s.time}</td>
-                <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{KES(s.total)}</td>
+                <td data-label="Cashier">{s.cashier}</td>
+                <td data-label="When" style={{ color: "var(--fg3)" }}>{s.time}</td>
+                <td className="num td-top" style={{ textAlign: "right", fontWeight: 700 }}>{KES(s.total)}</td>
               </tr>
             ))}
           </tbody>
