@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { getCharacter, type CharacterTemplate } from "./assets";
+import { KENNEY, available, kenneyModel } from "./kenney";
 
 /**
  * Articulated procedural person: hips/shoulders are pivots so legs and arms
@@ -57,6 +58,12 @@ export function makePerson(look: {
   pants?: string;
   hair?: string;
 }): Person {
+  // the Kenney characters give the whole world one consistent, friendly look
+  const names = available(KENNEY.characters);
+  if (names.length) {
+    const p = makeKenneyPerson(names[Math.floor(Math.random() * names.length)], { height: 1.1 });
+    if (p) return p;
+  }
   const tpl = getCharacter();
   if (tpl) {
     try {
@@ -320,5 +327,60 @@ function makePosedPerson(group: THREE.Group, model: THREE.Group): Person {
   };
   person.update?.(0);
   live.add(person);
+  return person;
+}
+
+
+/**
+ * A Kenney mini character: rigged and animated (idle/walk blend), standing `height` tall.
+ * `register: false` leaves per-frame animation to the caller (the street crowd runs its own).
+ */
+export function makeKenneyPerson(
+  name: string,
+  opts: { height?: number; walkRate?: number; register?: boolean } = {},
+): (Person & { update: (dt: number) => void; model: THREE.Group }) | null {
+  const m = kenneyModel(name);
+  if (!m) return null;
+  const group = new THREE.Group();
+  const k = (opts.height ?? 1.0) / m.size.y;
+  m.object.scale.setScalar(k);
+  group.add(m.object);
+
+  const mixer = new THREE.AnimationMixer(m.object);
+  const clip = (n: string) => m.clips.find((c) => c.name === n);
+  const idle = clip("idle") ? mixer.clipAction(clip("idle")!) : null;
+  const walk = clip("walk") ? mixer.clipAction(clip("walk")!) : null;
+  const hold = clip("holding-right") ? mixer.clipAction(clip("holding-right")!) : null;
+  idle?.play();
+  walk?.play();
+  hold?.play();
+  if (walk) walk.timeScale = opts.walkRate ?? 1.2;
+  if (idle) idle.time = Math.random() * idle.getClip().duration;
+  let amt = 0;
+  let reachV = 0;
+  const apply = () => {
+    if (walk) walk.weight = amt * (1 - reachV);
+    if (idle) idle.weight = (1 - amt) * (1 - reachV);
+    if (hold) hold.weight = reachV;
+  };
+  apply();
+
+  const handLocal = new THREE.Vector3();
+  const person = {
+    group,
+    handLocal,
+    model: m.object,
+    walk: (_phase: number, a: number) => {
+      amt = a;
+      apply();
+    },
+    reach: (v: number) => {
+      reachV = Math.min(1, Math.max(0, v));
+      handLocal.set(0.2, 0.6, 0.15 + 0.3 * reachV);
+      apply();
+    },
+    update: (dt: number) => mixer.update(dt),
+  };
+  if (opts.register !== false) live.add(person);
   return person;
 }

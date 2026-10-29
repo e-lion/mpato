@@ -11,7 +11,7 @@ to the procedural model, so you can add them one at a time.
 
 Planned next: `shelf.glb`, `counter.glb`.
 
-Keep the total under ~5 MB. Record each pack's author and license in `LICENSES.md`.
+Keep the total under ~10 MB (the Kenney set in `kenney/` is about 7 MB). Record each pack's author and license in `LICENSES.md`.
 
 ## More realistic people
 
@@ -20,3 +20,10 @@ is there now, and the loader also looks for `person-1.glb` ... `person-6.glb`. E
 characters from mixamo.com (free Adobe account) as FBX/GLB with the standard
 `mixamorig` skeleton, in T-pose; walking and idling are posed in code, so no animation
 clips are needed. With several files, each person picks one at random.
+
+
+## Kenney set (`kenney/`)
+
+Stylised CC0 models used for the town, vehicles and people (see `LICENSES.md`). Each GLB references
+`Textures/colormap.png` next to it, so keep each folder's `Textures/` with its models. `characters/`
+holds 11 rigged people (clips include `idle`, `walk`, `sit`, `emote-yes`, `interact-right`) plus a few accessories.
