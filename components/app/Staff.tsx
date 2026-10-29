@@ -74,7 +74,7 @@ export function Staff({ staff }: { staff: StaffMember[] }) {
           <span style={{ color: "var(--rose-600)", marginTop: 1 }}>
             <Icon name="send" size={16} />
           </span>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--fg2)", lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--fg2)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
             {pending === 1 ? "1 person hasn't" : `${pending} people haven't`} joined yet. Ask
             them to open <strong>{joinUrl}</strong> and sign up with the exact email you entered —
             they&apos;ll get access automatically.
@@ -84,7 +84,7 @@ export function Staff({ staff }: { staff: StaffMember[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <div
-          className="section-h"
+          className="section-h toolbar"
           style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", marginBottom: 0 }}
         >
           <div className="topsearch" style={{ width: 280, height: 38 }}>
@@ -106,7 +106,7 @@ export function Staff({ staff }: { staff: StaffMember[] }) {
               : "No staff match your search."}
           </div>
         ) : (
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -132,12 +132,12 @@ export function Staff({ staff }: { staff: StaffMember[] }) {
                         <span style={{ fontWeight: 600 }}>{s.name}</span>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Role">
                       <Badge kind={meta.badge} dot>
                         {meta.label}
                       </Badge>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       {s.active ? (
                         <Badge kind="success" dot>
                           Active
@@ -148,9 +148,9 @@ export function Staff({ staff }: { staff: StaffMember[] }) {
                         </Badge>
                       )}
                     </td>
-                    <td className="mono" style={{ color: "var(--fg2)" }}>{s.phone ?? "—"}</td>
-                    <td style={{ color: "var(--fg2)" }}>{s.email ?? "—"}</td>
-                    <td style={{ textAlign: "right" }}>
+                    <td className="mono" data-label="Phone" style={{ color: "var(--fg2)" }}>{s.phone ?? "—"}</td>
+                    <td className="td-wrap" data-label="Email" style={{ color: "var(--fg2)" }}>{s.email ?? "—"}</td>
+                    <td className="td-action" style={{ textAlign: "right" }}>
                       <button
                         className="iconbtn"
                         style={{ width: 28, height: 28, border: "none", background: "none" }}
