@@ -560,3 +560,13 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
   .msg-form { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
   .msg-form input { font-size: 16px; }
 }
+
+@media (max-width: 760px) {
+  /* A lone primary button in a toolbar spans the card, like the search above it. */
+  .content .toolbar > .btn { height: 44px; width: 100%; }
+  /* Long free text wraps inside stacked rows instead of being clipped. */
+  .tbl-stack td { max-width: none !important; }
+  .tbl-stack .td-notes { align-items: flex-start; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  .tbl-stack .td-notes::before { flex: none; }
+  .tbl-stack .td-notes { text-align: right; }
+}
