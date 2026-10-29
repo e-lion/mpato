@@ -163,7 +163,7 @@ export function ReceiveStock({
         <Link
           href="/inventory"
           style={{
-            display: "inline-flex",
+            display: onWorld ? "none" : "inline-flex",
             alignItems: "center",
             gap: 6,
             color: "var(--fg3)",
@@ -228,7 +228,7 @@ export function ReceiveStock({
         <Link
           href="/inventory"
           style={{
-            display: "inline-flex",
+            display: onWorld ? "none" : "inline-flex",
             alignItems: "center",
             gap: 6,
             color: "var(--fg3)",
@@ -696,9 +696,11 @@ export function ReceiveStock({
               <Btn variant="secondary" block onClick={reset}>
                 Log another
               </Btn>
-              <Btn variant="primary" block icon="package" onClick={() => router.push("/inventory")}>
-                Back to inventory
-              </Btn>
+              {!onWorld && (
+                <Btn variant="primary" block icon="package" onClick={() => router.push("/inventory")}>
+                  Back to inventory
+                </Btn>
+              )}
             </div>
           </div>
         </div>

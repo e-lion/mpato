@@ -109,9 +109,20 @@ export function World({
     [refreshWallet],
   );
 
+  const insetFor = useCallback(() => {
+    const w = window.innerWidth;
+    const h = containerRef.current?.clientHeight ?? window.innerHeight;
+    return w < 900
+      ? { right: 0, bottom: Math.round(h * 0.55) }
+      : { right: Math.min(980, Math.round(w * 0.56)), bottom: 0 };
+  }, []);
+
   const openRoom = useCallback(async (storeId: string, kind: "pos" | "receive") => {
     setSelectedId(null);
     setRoom({ kind, storeId, data: null } as Room);
+    // Set the dock inset first so the fly-in frames the shop in the free area.
+    const ins = insetFor();
+    engineRef.current?.setInset(ins.right, ins.bottom);
     engineRef.current?.focusShop(storeId);
     if (kind === "pos") {
       const data = await loadPosForWorld(storeId);
@@ -144,15 +155,13 @@ export function World({
     if (!ready) return;
     const apply = () => {
       if (!room) return engineRef.current?.setInset(0, 0);
-      const w = window.innerWidth;
-      const h = containerRef.current?.clientHeight ?? window.innerHeight;
-      if (w < 900) engineRef.current?.setInset(0, Math.round(h * 0.55));
-      else engineRef.current?.setInset(Math.min(980, Math.round(w * 0.56)), 0);
+      const ins = insetFor();
+      engineRef.current?.setInset(ins.right, ins.bottom);
     };
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
-  }, [ready, room]);
+  }, [ready, room, insetFor]);
 
   const pushEvent = useCallback((e: WorldEvent) => {
     if (engineRef.current) engineRef.current.pushEvent(e);
@@ -238,7 +247,7 @@ export function World({
       <div ref={containerRef} className="world-canvas" />
       {!ready && <div className="world-loading">Building your world…</div>}
 
-      <div className="world-hud">
+      <div className="world-hud" style={room ? { display: "none" } : undefined}>
         <div className="lbl">Across your shops · today</div>
         <div className="big">{KES(totals.sales)}</div>
         {activeStoreId && walletMap[activeStoreId] !== undefined && (
@@ -264,7 +273,7 @@ export function World({
         </button>
       </div>
 
-      <div className="world-hint">Drag to orbit · scroll to zoom · tap a shop or truck</div>
+      <div className="world-hint" style={room ? { display: "none" } : undefined}>Drag to orbit · scroll to zoom · tap a shop or truck</div>
 
       {toast && <div className="world-toast">{toast}</div>}
 
@@ -310,6 +319,60 @@ export function World({
             )}
           </div>
         </aside>
+      )}
+
+      {selected && (
+        <div className="world-panel" role="dialog" aria-label={`${selected.name} actions`}>
+          <div className="world-panel-h">
+            <div>
+              <h3>{selected.name}</h3>
+              {selected.area && <div className="area">{selected.area}</div>}
+            </div>
+            <button
+              type="button"
+              className="world-panel-close"
+              aria-label="Close"
+              onClick={() => setSelectedId(null)}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+
+          <div className="world-stats">
+            <div className="world-stat">
+              <div className="v">{KES(selected.salesToday)}</div>
+              <div className="k">Sales today</div>
+            </div>
+            <div className="world-stat">
+              <div className="v">{selected.ordersToday}</div>
+              <div className="k">Orders</div>
+            </div>
+            <div className={"world-stat" + (selected.lowStock > 0 ? " low" : "")}>
+              <div className="v">{selected.lowStock}</div>
+              <div className="k">Low stock</div>
+            </div>
+          </div>
+
+          <div className="world-actions">
+            {ACTIONS.filter((a) => canAccess(selected.role, a.path)).map((a) => (
+              <button
+                key={a.path}
+                type="button"
+                onClick={() =>
+                  a.path === "/pos"
+                    ? openRoom(selected.storeId, "pos")
+                    : a.path === "/inventory/receive"
+                      ? openRoom(selected.storeId, "receive")
+                      : navTo(selected.storeId, a.path)
+                }
+                disabled={pending}
+              >
+                <Icon name={a.icon} size={16} />
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

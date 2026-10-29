@@ -286,10 +286,18 @@ export class WorldEngine {
     this.deliveryScene = new DeliveryScene(this.interior, this.tweens, () => this.markDirty());
 
     const target = pos.clone().add(new THREE.Vector3(0, 0.7, 0.9));
-    const camPos = pos.clone().add(new THREE.Vector3(0, 5.6, 9.2));
+    // Pull back far enough that the whole shop fits in the part of the screen the drawer leaves free.
+    const w = this.container.clientWidth || 1;
+    const h = this.container.clientHeight || 1;
+    const fx = Math.max(0.2, (w - this.inset.right) / w);
+    const fy = Math.max(0.2, (h - this.inset.bottom) / h);
+    const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const dist = Math.max(7.2 / (2 * t * ((w * fx) / (h * fy))), 6.4 / (2 * t * fy), 9);
+    const dir = new THREE.Vector3(0, 5.6, 9.2).normalize();
+    const camPos = pos.clone().add(target.clone().sub(pos).multiplyScalar(0)).add(dir.multiplyScalar(dist)).add(new THREE.Vector3(0, 0.7, 0.9));
     this.flyCamera(camPos, target, () => {
-      this.controls.minDistance = 5;
-      this.controls.maxDistance = 16;
+      this.controls.minDistance = dist * 0.55;
+      this.controls.maxDistance = dist * 1.5;
       this.controls.minAzimuthAngle = -0.6;
       this.controls.maxAzimuthAngle = 0.6;
       this.controls.minPolarAngle = 0.7;
