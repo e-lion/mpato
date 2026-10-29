@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { setActiveStore } from "@/app/actions/active-store";
+import { loadPosForWorld, type PosDrawerData } from "@/app/actions/world";
+import { POS } from "./POS";
+import type { SaleSceneEvent } from "./world/bus";
 import { canAccess } from "@/lib/auth/access";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
@@ -37,6 +40,8 @@ export function World({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // Shop we're standing inside + its POS data (null data = still loading).
+  const [room, setRoom] = useState<{ storeId: string; data: PosDrawerData | null } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<EngineType | null>(null);
@@ -57,6 +62,43 @@ export function World({
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+
+  const sale = useCallback((e: SaleSceneEvent) => engineRef.current?.sale(e), []);
+
+  const openPos = useCallback(async (storeId: string) => {
+    setSelectedId(null);
+    setRoom({ storeId, data: null });
+    engineRef.current?.focusShop(storeId);
+    const data = await loadPosForWorld(storeId);
+    setRoom((r) => (r && r.storeId === storeId ? { storeId, data } : r));
+  }, []);
+
+  const leaveRoom = useCallback(() => {
+    sale({ type: "leave" });
+    engineRef.current?.focusShop(null);
+    setRoom(null);
+  }, [sale]);
+
+  // First customer walks in once the till (POS) is ready.
+  const roomReady = room?.data?.ok === true;
+  useEffect(() => {
+    if (roomReady) sale({ type: "start" });
+  }, [roomReady, sale]);
+
+  // Keep the shop framed beside the drawer (right dock on desktop, bottom sheet on phones).
+  useEffect(() => {
+    if (!ready) return;
+    const apply = () => {
+      if (!room) return engineRef.current?.setInset(0, 0);
+      const w = window.innerWidth;
+      const h = containerRef.current?.clientHeight ?? window.innerHeight;
+      if (w < 900) engineRef.current?.setInset(0, Math.round(h * 0.55));
+      else engineRef.current?.setInset(Math.min(980, Math.round(w * 0.56)), 0);
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, [ready, room]);
 
   const pushEvent = useCallback((e: WorldEvent) => {
     if (engineRef.current) engineRef.current.pushEvent(e);
@@ -167,6 +209,34 @@ export function World({
 
       {toast && <div className="world-toast">{toast}</div>}
 
+      {room && (
+        <aside className="world-drawer" aria-label="Point of sale">
+          <div className="world-drawer-h">
+            <div>
+              <h3>Point of sale</h3>
+              <div className="area">{stores.find((s) => s.storeId === room.storeId)?.name}</div>
+            </div>
+            <button type="button" className="world-drawer-back" onClick={leaveRoom}>
+              <Icon name="x" size={14} /> Back to map
+            </button>
+          </div>
+          <div className="world-drawer-body">
+            {!room.data && <div className="world-drawer-msg">Opening the till…</div>}
+            {room.data && !room.data.ok && (
+              <div className="world-drawer-msg">{room.data.error}</div>
+            )}
+            {room.data?.ok && (
+              <POS
+                products={room.data.products}
+                customers={room.data.customers}
+                settings={room.data.settings}
+                onWorld={sale}
+              />
+            )}
+          </div>
+        </aside>
+      )}
+
       {selected && (
         <div className="world-panel" role="dialog" aria-label={`${selected.name} actions`}>
           <div className="world-panel-h">
@@ -204,7 +274,9 @@ export function World({
               <button
                 key={a.path}
                 type="button"
-                onClick={() => navTo(selected.storeId, a.path)}
+                onClick={() =>
+                  a.path === "/pos" ? openPos(selected.storeId) : navTo(selected.storeId, a.path)
+                }
                 disabled={pending}
               >
                 <Icon name={a.icon} size={16} />

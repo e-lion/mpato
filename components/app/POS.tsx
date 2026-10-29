@@ -11,6 +11,7 @@ import { recordSale } from "@/app/actions/sales";
 import { initiateStkPush, checkStkPushStatus } from "@/app/actions/mpesa";
 import { sendWhatsAppMessage } from "@/app/actions/whatsapp";
 import { Receipt, type ReceiptData } from "./Receipt";
+import type { SaleSceneEvent } from "./world/bus";
 
 type Cart = Record<string, number>;
 type Done = {
@@ -27,10 +28,13 @@ export function POS({
   products,
   customers,
   settings,
+  onWorld,
 }: {
   products: Product[];
   customers: Customer[];
   settings: StoreSettings | null;
+  /** Set when POS is embedded in the 3D world: reports what the user is doing so the scene can act it out. */
+  onWorld?: (e: SaleSceneEvent) => void;
 }) {
   const router = useRouter();
   const [cat, setCat] = useState<string>("All");
@@ -81,10 +85,14 @@ export function POS({
       .slice(0, 30);
   }, [customers, pickerQuery]);
 
-  const add = (p: Product) =>
+  const add = (p: Product) => {
+    onWorld?.({ type: "item", delta: 1, cat: p.cat });
     setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 }));
+  };
 
-  const bump = (id: string, d: number) =>
+  const bump = (id: string, d: number) => {
+    const cat = products.find((x) => x.id === id)?.cat;
+    onWorld?.({ type: "item", delta: d > 0 ? 1 : -1, cat });
     setCart((c) => {
       const n = (c[id] || 0) + d;
       const next = { ...c };
@@ -92,6 +100,7 @@ export function POS({
       else next[id] = n;
       return next;
     });
+  };
 
   const list = products.filter(
     (p) =>
@@ -118,6 +127,7 @@ export function POS({
       unitPrice: l.p.price,
     }));
     const attachedName = selectedCustomer?.name ?? null;
+    onWorld?.({ type: "paying", method });
     startTransition(async () => {
       const result = await recordSale({
         method,
@@ -127,8 +137,10 @@ export function POS({
       });
       if (!result.ok) {
         setError(result.error);
+        onWorld?.({ type: "payCancel" });
         return;
       }
+      onWorld?.({ type: "paid", method, total: Math.round(result.totalCents / 100) });
       setMpesaPrompt(false);
       setMpesaRef("");
       setDone({
@@ -151,6 +163,7 @@ export function POS({
     setStkPhone(selectedCustomer?.phone || "");
     setManualMpesa(false);
     setMpesaPrompt(true);
+    onWorld?.({ type: "paying", method: "mpesa" });
   };
 
   const cancelMpesa = () => {
@@ -159,6 +172,7 @@ export function POS({
     setMpesaRef("");
     setStkRequestId(null);
     setError(null);
+    onWorld?.({ type: "payCancel" });
   };
 
   const confirmMpesa = () => {
@@ -176,6 +190,7 @@ export function POS({
     if (!res.ok) {
       setError(res.error);
       setStkStatus("failed");
+      onWorld?.({ type: "payCancel" });
       return;
     }
     setStkRequestId(res.checkoutRequestId!);
@@ -213,6 +228,7 @@ export function POS({
   }, [stkRequestId, stkStatus]);
 
   const reset = () => {
+    onWorld?.({ type: "next" });
     setDone(null);
     setShowReceipt(false);
     setCart({});

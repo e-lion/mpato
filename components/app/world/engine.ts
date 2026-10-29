@@ -7,6 +7,10 @@ import { PAL } from "./palette";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
 import type { WorldEvent } from "./types";
+import type { SaleSceneEvent } from "./bus";
+import { Tweens, easeInOut as ease } from "./tween";
+import { buildInterior, type Interior } from "./interior";
+import { SaleScene } from "./saleScene";
 
 const SP = 6; // lattice spacing between shops
 
@@ -59,7 +63,14 @@ export class WorldEngine {
   private raf = 0;
   private dirtyUntil = 0;
   private disposed = false;
-  private ambientTimer: ReturnType<typeof setInterval> | null = null;
+  private sun!: THREE.DirectionalLight;
+  private tweens = new Tweens();
+  private focusId: string | null = null;
+  private focusReturnId: string | null = null;
+  private interior: Interior | null = null;
+  private saleScene: SaleScene | null = null;
+  private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+  private inset = { right: 0, bottom: 0 };
   private resizeObs: ResizeObserver;
   private downAt: { x: number; y: number } | null = null;
 
@@ -83,7 +94,10 @@ export class WorldEngine {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.setSize(w, h);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
+    this.tweens.instant = this.reducedMotion;
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.setSize(w, h);
@@ -108,7 +122,17 @@ export class WorldEngine {
     this.scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(PAL.stone200).getHex(), 0.9));
     const dir = new THREE.DirectionalLight(0xffffff, 1.0);
     dir.position.set(8, 16, 6);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.camera.left = -14;
+    dir.shadow.camera.right = 14;
+    dir.shadow.camera.top = 14;
+    dir.shadow.camera.bottom = -14;
+    dir.shadow.camera.far = 60;
+    dir.shadow.bias = -0.0004;
+    dir.shadow.normalBias = 0.03;
     this.scene.add(dir);
+    this.sun = dir;
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
     // ground + grid
@@ -118,6 +142,7 @@ export class WorldEngine {
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
+    ground.receiveShadow = true;
     this.scene.add(ground);
     const grid = new THREE.GridHelper(160, 80, new THREE.Color(PAL.stone300), new THREE.Color(PAL.stone200));
     (grid.material as THREE.Material).transparent = true;
@@ -133,7 +158,6 @@ export class WorldEngine {
     this.resizeObs = new ResizeObserver(() => this.onResize());
     this.resizeObs.observe(container);
 
-    this.startAmbient();
     this.clock.start();
     this.markDirty();
     this.raf = requestAnimationFrame(this.tick);
@@ -163,8 +187,7 @@ export class WorldEngine {
         this.shops.set(s.storeId, this.buildShop(s, pos));
       }
     }
-    this.fitCamera();
-    this.restartAmbient();
+    if (!this.focusId) this.fitCamera();
     this.markDirty();
   }
 
@@ -174,6 +197,8 @@ export class WorldEngine {
   }
 
   pushEvent(e: WorldEvent) {
+    // While inside a shop the scene is driven only by what the user is doing.
+    if (this.focusId) return;
     const pos = this.posByStore.get(e.storeId);
     if (!pos) return;
     if (e.kind === "delivery") this.spawnTruck(e.storeId, pos);
@@ -195,10 +220,109 @@ export class WorldEngine {
     this.markDirty();
   }
 
+  // ---- inside a shop ----------------------------------------------------
+
+  /** Fly into a shop's interior (id) or back out to the map (null). */
+  focusShop(id: string | null) {
+    if (id === this.focusId) return;
+    if (id) this.enterShop(id);
+    else this.exitShop();
+  }
+
+  /** Forward POS-drawer events to the sale choreography. */
+  sale(e: SaleSceneEvent) {
+    this.saleScene?.handle(e);
+    this.markDirty();
+  }
+
+  private setShopsHidden(hidden: boolean, only?: string) {
+    for (const [sid, node] of this.shops) {
+      if (only && sid !== only) continue;
+      node.group.visible = !hidden;
+      node.group.traverse((o) => {
+        if ((o as CSS2DObject).element) o.visible = !hidden;
+      });
+    }
+  }
+
+  private flyCamera(toPos: THREE.Vector3, toTarget: THREE.Vector3, done?: () => void) {
+    const fromPos = this.camera.position.clone();
+    const fromTarget = this.controls.target.clone();
+    this.controls.enabled = false;
+    this.tweens.add(
+      1.0,
+      (p) => {
+        this.camera.position.lerpVectors(fromPos, toPos, p);
+        this.controls.target.lerpVectors(fromTarget, toTarget, p);
+        this.camera.lookAt(this.controls.target);
+      },
+      { ease: ease, done: () => { this.controls.enabled = true; done?.(); } },
+    );
+  }
+
+  private enterShop(id: string) {
+    const pos = this.posByStore.get(id);
+    if (!pos) return;
+    this.saleScene?.dispose();
+    this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
+    this.focusId = id;
+    this.setShopsHidden(true);
+
+    const store = this.stores.find((s) => s.storeId === id);
+    void store;
+    this.interior = buildInterior(PAL.ember);
+    this.interior.group.position.copy(pos);
+    this.scene.add(this.interior.group);
+    this.saleScene = new SaleScene(this.interior, this.tweens, () => this.markDirty());
+
+    const target = pos.clone().add(new THREE.Vector3(0, 0.7, 0.9));
+    const camPos = pos.clone().add(new THREE.Vector3(0, 5.6, 9.2));
+    this.flyCamera(camPos, target, () => {
+      this.controls.minDistance = 5;
+      this.controls.maxDistance = 16;
+      this.controls.minAzimuthAngle = -0.6;
+      this.controls.maxAzimuthAngle = 0.6;
+      this.controls.minPolarAngle = 0.7;
+      this.controls.maxPolarAngle = 1.35;
+    });
+    this.markDirty();
+  }
+
+  private exitShop() {
+    this.saleScene?.dispose();
+    this.saleScene = null;
+    this.tweens.clear();
+    const room = this.interior;
+    this.interior = null;
+    this.focusReturnId = this.focusId;
+    this.focusId = null;
+    this.controls.minAzimuthAngle = -Infinity;
+    this.controls.maxAzimuthAngle = Infinity;
+    this.controls.minPolarAngle = 0.25;
+    this.controls.maxPolarAngle = 1.15;
+    this.controls.minDistance = 6;
+    this.controls.maxDistance = this.baseR * 2.6;
+    const pose = this.mapPose ?? { pos: this.home.clone(), target: new THREE.Vector3() };
+    const home = this.focusReturnId;
+    this.flyCamera(pose.pos, pose.target, () => {
+      if (home) this.setShopsHidden(false, home);
+      if (room) this.disposeGroup(room.group);
+      this.markDirty();
+    });
+    // reveal the rest of the map as we start flying out; this shop returns when we land
+    for (const [sid, node] of this.shops) {
+      if (sid === home) continue;
+      node.group.visible = true;
+      node.group.traverse((o) => { if ((o as CSS2DObject).element) o.visible = true; });
+    }
+    this.markDirty();
+  }
+
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
-    if (this.ambientTimer) clearInterval(this.ambientTimer);
+    this.saleScene?.dispose();
+    this.tweens.clear();
     this.resizeObs.disconnect();
     const dom = this.renderer.domElement;
     dom.removeEventListener("pointerdown", this.onPointerDown);
@@ -316,6 +440,9 @@ export class WorldEngine {
     label.position.set(0, h + 1.1, 0);
     group.add(label);
 
+    group.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
     this.scene.add(group);
     return { group, wallMat, store, pos: pos.clone(), pulse: 0, selected: false };
   }
@@ -433,24 +560,6 @@ export class WorldEngine {
     if (node) node.pulse = 1;
   }
 
-  private startAmbient() {
-    if (this.reducedMotion) return;
-    this.ambientTimer = setInterval(() => {
-      if (this.disposed || this.stores.length === 0 || this.agents.length > 14) return;
-      const weight = (s: WorldStore) => Math.max(1, s.ordersToday);
-      const total = this.stores.reduce((sum, s) => sum + weight(s), 0);
-      let r = Math.random() * total;
-      let pick = this.stores[0];
-      for (const s of this.stores) { r -= weight(s); if (r <= 0) { pick = s; break; } }
-      const pos = this.posByStore.get(pick.storeId);
-      if (pos) { this.spawnCustomer(pos, true); this.markDirty(); }
-    }, 2600);
-  }
-  private restartAmbient() {
-    if (this.ambientTimer) { clearInterval(this.ambientTimer); this.ambientTimer = null; }
-    this.startAmbient();
-  }
-
   // ---- input ------------------------------------------------------------
 
   private onPointerDown = (e: PointerEvent) => { this.downAt = { x: e.clientX, y: e.clientY }; };
@@ -473,6 +582,7 @@ export class WorldEngine {
   };
 
   private pick(e: PointerEvent): THREE.Object3D | null {
+    if (this.focusId) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.set(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -497,7 +607,24 @@ export class WorldEngine {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.labelRenderer.setSize(w, h);
+    this.applyInset();
     this.markDirty();
+  }
+
+  /** Shift the visible scene away from UI docked on the right/bottom. */
+  setInset(right: number, bottom: number) {
+    this.inset = { right, bottom };
+    this.applyInset();
+    this.markDirty();
+  }
+
+  private applyInset() {
+    const w = this.container.clientWidth || 1;
+    const h = this.container.clientHeight || 1;
+    const { right, bottom } = this.inset;
+    if (right === 0 && bottom === 0) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(w, h, right / 2, bottom / 2, w, h);
+    this.camera.updateProjectionMatrix();
   }
 
   private markDirty() { this.dirtyUntil = performance.now() + 60; }
@@ -511,6 +638,11 @@ export class WorldEngine {
     let dirty = performance.now() < this.dirtyUntil;
 
     this.controls.update();
+
+    if (this.tweens.active) {
+      dirty = true;
+      this.tweens.step(dt);
+    }
 
     if (this.agents.length) {
       dirty = true;
@@ -555,6 +687,8 @@ export class WorldEngine {
 
 function mesh(geo: THREE.BufferGeometry, color: string, pos: [number, number, number]) {
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.82 }));
+  m.castShadow = true;
+  m.receiveShadow = true;
   m.position.set(pos[0], pos[1], pos[2]);
   return m;
 }
