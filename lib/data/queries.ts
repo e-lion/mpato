@@ -8,6 +8,7 @@ import {
 } from "./active-store";
 import type { Customer, Product, RecentSale } from "./types";
 import type { TileKey } from "@/lib/mockData";
+import { type Role } from "@/lib/auth/access";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>;
@@ -440,6 +441,7 @@ export async function getRecentSales(storeId: string, limit = 5): Promise<Recent
     total: Math.round((r.total_cents as number) / 100),
     method: r.method as "mpesa" | "cash",
     time: relativeTime(r.created_at as string),
+    at: r.created_at as string,
     cashier: cashierLabel((r.cashier_id as string | null) ?? null),
   }));
 }
@@ -628,4 +630,86 @@ export async function getOwnerStoresOverview(): Promise<OwnerOverview | null> {
   );
 
   return { stores, combined };
+}
+
+export type WorldStore = {
+  storeId: string;
+  name: string;
+  area: string | null;
+  /** The current user's role in THIS store — gates per-building actions. */
+  role: Role;
+  salesToday: number;
+  ordersToday: number;
+  lowStock: number;
+};
+
+/** Live "today" stats for every shop the current user belongs to (any role),
+ *  for the isometric World map. One building per membership. RLS already limits
+ *  visibility to the user's stores; the .in(ids) filter just scopes the reads.
+ *  Returns busiest-first so the top-selling shop reads as the biggest building. */
+export async function getWorldStores(): Promise<WorldStore[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const memberships = await getMemberships(supabase, user.id);
+  if (memberships.length === 0) return [];
+
+  const ids = memberships.map((m) => m.storeId);
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const iso = startOfDay.toISOString();
+
+  const [{ data: storeRows }, { data: salesRows }, { data: productRows }] = await Promise.all([
+    supabase.from("mpato_stores").select("id, name, area").in("id", ids),
+    supabase
+      .from("mpato_sales")
+      .select("store_id, total_cents")
+      .in("store_id", ids)
+      .gte("created_at", iso),
+    supabase.from("mpato_products").select("store_id, stock").in("store_id", ids),
+  ]);
+
+  const meta = new Map<string, { name: string; area: string | null }>(
+    ((storeRows ?? []) as Row[]).map((s) => [
+      s.id as string,
+      { name: s.name as string, area: (s.area as string | null) ?? null },
+    ]),
+  );
+
+  const sales = new Map<string, { sales: number; orders: number }>();
+  const lowStock = new Map<string, number>();
+  for (const id of ids) {
+    sales.set(id, { sales: 0, orders: 0 });
+    lowStock.set(id, 0);
+  }
+  for (const r of (salesRows ?? []) as Row[]) {
+    const a = sales.get(r.store_id as string);
+    if (!a) continue;
+    a.sales += Number(r.total_cents) || 0;
+    a.orders += 1;
+  }
+  for (const r of (productRows ?? []) as Row[]) {
+    if ((r.stock as number) <= 6) {
+      const id = r.store_id as string;
+      lowStock.set(id, (lowStock.get(id) ?? 0) + 1);
+    }
+  }
+
+  return memberships
+    .map((m) => {
+      const a = sales.get(m.storeId)!;
+      const info = meta.get(m.storeId);
+      return {
+        storeId: m.storeId,
+        name: info?.name ?? "Shop",
+        area: info?.area ?? null,
+        role: m.role,
+        salesToday: a.sales / 100,
+        ordersToday: a.orders,
+        lowStock: lowStock.get(m.storeId) ?? 0,
+      };
+    })
+    .sort((x, y) => y.salesToday - x.salesToday);
 }

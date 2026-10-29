@@ -19,6 +19,7 @@ const OWNER_ONLY: Role[] = ["owner"];
 
 const RULES: Rule[] = [
   { prefix: "/dashboard", roles: ALL },
+  { prefix: "/world", roles: ALL },
   { prefix: "/pos", roles: ALL },
   { prefix: "/customers", roles: ALL },
   { prefix: "/messages", roles: MANAGE },

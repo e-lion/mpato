@@ -1,0 +1,219 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Icon } from "./Icon";
+import { setActiveStore } from "@/app/actions/active-store";
+import { canAccess } from "@/lib/auth/access";
+import { KES } from "@/lib/format";
+import type { WorldStore } from "@/lib/data/queries";
+import type { WorldEvent } from "./world/types";
+import { useStoreActivity } from "./world/useStoreActivity";
+
+type EngineType = import("./world/engine").WorldEngine;
+type PickInfo = { amountKES: number; method?: "mpesa" | "cash" };
+
+// Actions on a selected shop → the real tools, gated per-store by role.
+const ACTIONS: { path: string; label: string; icon: string }[] = [
+  { path: "/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+  { path: "/pos", label: "Point of sale", icon: "shopping-cart" },
+  { path: "/inventory", label: "Inventory", icon: "package" },
+  { path: "/inventory/receive", label: "Receive stock", icon: "truck" },
+  { path: "/suppliers", label: "Suppliers", icon: "boxes" },
+  { path: "/customers", label: "Customers", icon: "users" },
+];
+
+export function World({
+  stores,
+  activeStoreId,
+  seedEvents,
+}: {
+  stores: WorldStore[];
+  activeStoreId: string | null;
+  seedEvents: WorldEvent[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<EngineType | null>(null);
+  const pending3d = useRef<WorldEvent[]>([]);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stable callbacks the engine captures once.
+  const navTo = useCallback(
+    (storeId: string, path: string) =>
+      start(async () => {
+        await setActiveStore(storeId);
+        router.push(path);
+      }),
+    [router],
+  );
+  const onPick = useCallback((info: PickInfo) => {
+    setToast(`${info.method === "cash" ? "Cash" : "M-PESA"} sale · ${KES(info.amountKES)}`);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  const pushEvent = useCallback((e: WorldEvent) => {
+    if (engineRef.current) engineRef.current.pushEvent(e);
+    else pending3d.current.push(e);
+  }, []);
+
+  // Create the engine once (lazy-imports three, so it never ships in the main bundle).
+  useEffect(() => {
+    if (stores.length === 0 || !containerRef.current) return;
+    let engine: EngineType | null = null;
+    let cancelled = false;
+    (async () => {
+      const { WorldEngine } = await import("./world/engine");
+      if (cancelled || !containerRef.current) return;
+      engine = new WorldEngine(containerRef.current, {
+        onSelectShop: (id) => setSelectedId(id),
+        onReceive: (id) => navTo(id, "/inventory/receive"),
+        onPick,
+      });
+      engineRef.current = engine;
+      setReady(true);
+      pending3d.current.forEach((e) => engine!.pushEvent(e));
+      pending3d.current = [];
+    })();
+    return () => {
+      cancelled = true;
+      engine?.dispose();
+      engineRef.current = null;
+      setReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stores.length > 0]);
+
+  // Feed data to the engine whenever it changes.
+  useEffect(() => {
+    if (ready) engineRef.current?.setStores(stores, activeStoreId);
+  }, [ready, stores, activeStoreId]);
+  useEffect(() => {
+    if (ready) engineRef.current?.setSelected(selectedId);
+  }, [ready, selectedId]);
+
+  // Live sales/deliveries (realtime, polling fallback) across all the user's shops.
+  useStoreActivity(stores.length > 0, pushEvent);
+
+  // Replay today's recent activity on load so the world opens with real scenarios.
+  useEffect(() => {
+    const timers = seedEvents.slice(0, 6).map((e, i) =>
+      setTimeout(() => pushEvent({ ...e, id: "seed_" + e.id }), 1200 + i * 1400),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [seedEvents, pushEvent]);
+
+  const selected = stores.find((s) => s.storeId === selectedId) ?? null;
+  const totals = useMemo(
+    () => ({
+      sales: stores.reduce((s, x) => s + x.salesToday, 0),
+      orders: stores.reduce((s, x) => s + x.ordersToday, 0),
+    }),
+    [stores],
+  );
+
+  if (stores.length === 0) {
+    return (
+      <div className="world-wrap" style={{ cursor: "default" }}>
+        <div className="world-empty">
+          <div className="inner">
+            <div className="ico">
+              <Icon name="store" size={30} />
+            </div>
+            <h2>No shops yet</h2>
+            <p>
+              Create your first shop from the store switcher in the sidebar, and it&apos;ll appear
+              here as a building you can step into.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="world-wrap">
+      <div ref={containerRef} className="world-canvas" />
+      {!ready && <div className="world-loading">Building your world…</div>}
+
+      <div className="world-hud">
+        <div className="lbl">Across your shops · today</div>
+        <div className="big">{KES(totals.sales)}</div>
+        <div className="meta">
+          {stores.length} {stores.length === 1 ? "shop" : "shops"} · {totals.orders}{" "}
+          {totals.orders === 1 ? "order" : "orders"} · live
+        </div>
+      </div>
+
+      <div className="world-ctrl">
+        <button type="button" aria-label="Zoom in" onClick={() => engineRef.current?.zoom(1 / 1.25)}>
+          <Icon name="plus" size={18} />
+        </button>
+        <button type="button" aria-label="Zoom out" onClick={() => engineRef.current?.zoom(1.25)}>
+          <Icon name="minus" size={18} />
+        </button>
+        <button type="button" aria-label="Recentre" onClick={() => engineRef.current?.recenter()}>
+          <Icon name="locate-fixed" size={18} />
+        </button>
+      </div>
+
+      <div className="world-hint">Drag to orbit · scroll to zoom · tap a shop or truck</div>
+
+      {toast && <div className="world-toast">{toast}</div>}
+
+      {selected && (
+        <div className="world-panel" role="dialog" aria-label={`${selected.name} actions`}>
+          <div className="world-panel-h">
+            <div>
+              <h3>{selected.name}</h3>
+              {selected.area && <div className="area">{selected.area}</div>}
+            </div>
+            <button
+              type="button"
+              className="world-panel-close"
+              aria-label="Close"
+              onClick={() => setSelectedId(null)}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+
+          <div className="world-stats">
+            <div className="world-stat">
+              <div className="v">{KES(selected.salesToday)}</div>
+              <div className="k">Sales today</div>
+            </div>
+            <div className="world-stat">
+              <div className="v">{selected.ordersToday}</div>
+              <div className="k">Orders</div>
+            </div>
+            <div className={"world-stat" + (selected.lowStock > 0 ? " low" : "")}>
+              <div className="v">{selected.lowStock}</div>
+              <div className="k">Low stock</div>
+            </div>
+          </div>
+
+          <div className="world-actions">
+            {ACTIONS.filter((a) => canAccess(selected.role, a.path)).map((a) => (
+              <button
+                key={a.path}
+                type="button"
+                onClick={() => navTo(selected.storeId, a.path)}
+                disabled={pending}
+              >
+                <Icon name={a.icon} size={16} />
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
