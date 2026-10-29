@@ -353,8 +353,8 @@ export function ReceiveStock({
               </button>
             </div>
 
-            <div className="card" style={{ overflow: "hidden", border: "1px solid var(--border)", boxShadow: "none" }}>
-              <table className="tbl" style={{ background: "transparent" }}>
+            <div className="card lines-card" style={{ overflow: "hidden", border: "1px solid var(--border)", boxShadow: "none" }}>
+              <table className="tbl tbl-lines" style={{ background: "transparent" }}>
                 <thead>
                   <tr>
                     <th style={{ width: "45%" }}>Product</th>
@@ -370,7 +370,7 @@ export function ReceiveStock({
                     const lineTotal = l.qty * l.unitCost;
                     return (
                       <tr key={l.rowKey}>
-                        <td>
+                        <td className="td-product">
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             {product && (
                               <div
@@ -413,7 +413,7 @@ export function ReceiveStock({
                             </select>
                           </div>
                         </td>
-                        <td>
+                        <td className="td-qty" data-label="Qty">
                           <input
                             type="number"
                             min={1}
@@ -428,7 +428,7 @@ export function ReceiveStock({
                             className="num"
                           />
                         </td>
-                        <td>
+                        <td className="td-cost" data-label="Unit cost (KES)">
                           <input
                             type="number"
                             min={0}
@@ -444,12 +444,13 @@ export function ReceiveStock({
                           />
                         </td>
                         <td
-                          className="num"
+                          className="num td-total"
+                          data-label="Line total"
                           style={{ textAlign: "right", fontWeight: 600, color: "var(--fg1)" }}
                         >
                           {Number.isFinite(lineTotal) ? KES(Math.round(lineTotal)) : "—"}
                         </td>
-                        <td style={{ textAlign: "right" }}>
+                        <td className="td-remove" style={{ textAlign: "right" }}>
                           <button
                             type="button"
                             onClick={() => removeLine(l.rowKey)}

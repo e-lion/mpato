@@ -1,4 +1,6 @@
 export const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+/** Quintic smootherstep: zero velocity AND acceleration at both ends, so camera moves never lurch. */
+export const easeSmooth = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 export const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 
 type Tween = {

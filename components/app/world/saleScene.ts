@@ -87,7 +87,7 @@ export class SaleScene {
     const a = this.room.anchors;
     const c: Customer = { person, state: "walking", stop: () => undefined };
     this.customer = c;
-    c.stop = this.walk(person, [a.street, a.door, a.customer], 2.4, () => {
+    c.stop = this.walk(person, [a.street, a.curbFar, a.curbNear, a.door, a.customer], 2.4, () => {
       c.state = "waiting";
       this.face(person, Math.PI); // face the counter (-z)
       this.face(this.room.shopkeeper, 0);
@@ -285,7 +285,7 @@ export class SaleScene {
     if (abandon) this.clearCounter();
     const a = this.room.anchors;
     const person = c.person;
-    this.walk(person, [person.group.position.clone(), a.door, a.street.clone().setX(-1.6)], 2.6, () => {
+    this.walk(person, [person.group.position.clone(), a.door, a.curbNear, a.curbFar, a.street.clone().setX(-1.6)], 2.6, () => {
       this.room.group.remove(person.group);
     });
     this.dirty();

@@ -32,8 +32,9 @@ function signTexture(text: string) {
   return tex;
 }
 
-function buildTruck(name: string) {
+function buildTruck(name: string, model: THREE.Group | null) {
   const g = new THREE.Group();
+  if (model) return buildModelTruck(g, name, model);
   const add = (geo: THREE.BufferGeometry, color: string, pos: [number, number, number], rough = 0.7) => {
     const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: rough }));
     m.position.set(...pos);
@@ -77,6 +78,24 @@ function buildTruck(name: string) {
   return g;
 }
 
+/** The real truck model, fitted and labelled with the supplier's name. */
+function buildModelTruck(g: THREE.Group, name: string, model: THREE.Group) {
+  const alongX = fitModel(model, 3.0);
+  if (!alongX) model.rotation.y = Math.PI / 2;
+  g.add(model);
+  // the model carries its own livery, so show the supplier as a name tag
+  const el = document.createElement("div");
+  el.className = "world3d-label active";
+  const nm = document.createElement("span");
+  nm.className = "nm";
+  nm.textContent = name;
+  el.appendChild(nm);
+  const tag = new CSS2DObject(el);
+  tag.position.set(0, 2.1, 0);
+  g.add(tag);
+  return g;
+}
+
 /**
  * Choreography for the receive-stock drawer. A supplier's truck pulls up only
  * once the user picks that supplier; when the receipt is saved the driver
@@ -88,13 +107,16 @@ export class DeliveryScene {
   private crates: THREE.Object3D[] = [];
   private truckName: string | null = null;
   private busy = false;
+  private arriving = false;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(
     private room: Interior,
     private tweens: Tweens,
     private dirty: () => void,
-  ) {}
+  ) {
+    void loadGltfScene("/models/truck.glb"); // warm the cache so the truck can appear straight away
+  }
 
   handle(e: DeliverySceneEvent) {
     switch (e.type) {
@@ -134,40 +156,31 @@ export class DeliveryScene {
   }
 
   private arrive(name: string) {
-    if (this.truck) return;
-    const truck = buildTruck(name);
-    truck.position.set(-9, 0, STREET_Z);
-    this.room.group.add(truck);
-    this.truck = truck;
-    // stacked crates visible in the cargo area
-    for (let i = 0; i < 3; i++) {
-      const c = makeGoods(PAL.crate, 0.32);
-      c.position.set(-0.9 + i * 0.45, 1.8, 0.1);
-      truck.add(c);
-    }
-    // Swap in a real model if public/models/truck.glb exists.
-    loadGltfScene("/models/truck.glb").then((model) => {
-      if (!model || this.truck !== truck) return;
-      const alongX = fitModel(model, 3.0);
-      if (!alongX) model.rotation.y = Math.PI / 2;
-      truck.children.filter((c) => c.userData.proc).forEach((c) => truck.remove(c));
-      truck.add(model);
-      // the real model carries its own livery, so show the supplier as a name tag
-      const el = document.createElement("div");
-      el.className = "world3d-label active";
-      const nm = document.createElement("span");
-      nm.className = "nm";
-      nm.textContent = name;
-      el.appendChild(nm);
-      const tag = new CSS2DObject(el);
-      tag.position.set(0, 2.1, 0);
-      truck.add(tag);
+    if (this.truck || this.arriving) return;
+    this.arriving = true;
+    // Resolve the model BEFORE building anything, so the truck that drives in is the truck that parks
+    // (building a placeholder and swapping the real model in mid-drive made it change shape).
+    void loadGltfScene("/models/truck.glb").then((model) => {
+      this.arriving = false;
+      if (this.truck || this.truckName !== name) return; // supplier changed while loading
+      const truck = buildTruck(name, model);
+      truck.position.set(-9, 0, STREET_Z);
+      this.room.group.add(truck);
+      this.truck = truck;
+      if (!model) {
+        // stacked crates visible in the cargo area of the procedural truck
+        for (let i = 0; i < 3; i++) {
+          const c = makeGoods(PAL.crate, 0.32);
+          c.position.set(-0.9 + i * 0.45, 1.8, 0.1);
+          truck.add(c);
+        }
+      }
+      const from = truck.position.x;
+      this.tweens.add(2.2, (p) => (truck.position.x = from + (PARK_X - from) * p), {
+        ease: easeOut,
+        done: () => this.driverExits(),
+      });
       this.dirty();
-    });
-    const from = truck.position.x;
-    this.tweens.add(2.2, (p) => (truck.position.x = from + (PARK_X - from) * p), {
-      ease: easeOut,
-      done: () => this.driverExits(),
     });
   }
 
@@ -211,7 +224,8 @@ export class DeliveryScene {
     const rear = new THREE.Vector3(PARK_X - 1.3, 0, STREET_Z + 0.95);
     const path = [
       d.group.position.clone(),
-      new THREE.Vector3(0.5, 0, 3.0),
+      a.curbFar,
+      a.curbNear,
       a.door,
       new THREE.Vector3(2.0, 0, 1.1),
       new THREE.Vector3(2.0, 0, -1.2),
@@ -238,7 +252,7 @@ export class DeliveryScene {
       this.tweens.add(0.9, (p) => d.reach(Math.sin(p * Math.PI)), { done: () => d.reach(0) });
       this.later(() => {
         this.pay(paid, d);
-        walkPath(this.tweens, d, [d.group.position.clone(), new THREE.Vector3(2.0, 0, 1.1), a.door, new THREE.Vector3(0.5, 0, 3.0), rear], 2.4, () => {
+        walkPath(this.tweens, d, [d.group.position.clone(), new THREE.Vector3(2.0, 0, 1.1), a.door, a.curbNear, a.curbFar, rear], 2.4, () => {
           this.depart();
         });
       }, 700 + n * 180);

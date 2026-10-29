@@ -8,12 +8,13 @@ import { PAL } from "./palette";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
 import type { WorldEvent } from "./types";
-import type { SaleSceneEvent, DeliverySceneEvent } from "./bus";
+import type { SaleSceneEvent, DeliverySceneEvent, RoomSceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
-import { Tweens, easeInOut as ease } from "./tween";
+import { RoomScene } from "./roomScene";
+import { Tweens, easeSmooth } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { preloadCharacter } from "./assets";
-import { updatePeople } from "./people";
+import { makePerson, updatePeople } from "./people";
 import { SaleScene } from "./saleScene";
 
 const SP = 6; // lattice spacing between shops
@@ -58,6 +59,9 @@ export class WorldEngine {
   private clock = new THREE.Clock();
   private shops = new Map<string, ShopNode>();
   private agents: AgentNode[] = [];
+  /** People are only spawned once the character models are in, so nobody pops from a placeholder to a real body. */
+  private charsLoaded = false;
+  private charsReady: Promise<void> = Promise.resolve();
   private posByStore = new Map<string, THREE.Vector3>();
   private stores: WorldStore[] = [];
   private activeStoreId: string | null = null;
@@ -74,8 +78,12 @@ export class WorldEngine {
   private interior: Interior | null = null;
   private saleScene: SaleScene | null = null;
   private deliveryScene: DeliveryScene | null = null;
+  private roomScene: RoomScene | null = null;
   private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private inset = { right: 0, bottom: 0 };
+  /** Where the (animated) inset is heading; framing maths uses this, not the in-flight value. */
+  private insetTo = { right: 0, bottom: 0 };
+  private cancelInset: (() => void) | null = null;
   private resizeObs: ResizeObserver;
   private downAt: { x: number; y: number } | null = null;
 
@@ -170,7 +178,7 @@ export class WorldEngine {
     this.resizeObs = new ResizeObserver(() => this.onResize());
     this.resizeObs.observe(container);
 
-    void preloadCharacter(); // ready by the time the user steps into a shop
+    this.charsReady = preloadCharacter().then(() => { this.charsLoaded = true; }); // ready by the time the user steps into a shop
     this.clock.start();
     this.markDirty();
     this.raf = requestAnimationFrame(this.tick);
@@ -254,6 +262,12 @@ export class WorldEngine {
     this.markDirty();
   }
 
+  /** Forward dashboard / inventory / customers drawer events to the room choreography. */
+  roomEvent(e: RoomSceneEvent) {
+    this.roomScene?.handle(e);
+    this.markDirty();
+  }
+
   private setShopsHidden(hidden: boolean, only?: string) {
     for (const [sid, node] of this.shops) {
       if (only && sid !== only) continue;
@@ -264,18 +278,41 @@ export class WorldEngine {
     }
   }
 
-  private flyCamera(toPos: THREE.Vector3, toTarget: THREE.Vector3, done?: () => void) {
-    const fromPos = this.camera.position.clone();
+  /**
+   * Glide the camera on an orbit-style arc: the look-at point travels in a line while the
+   * camera swings around it in spherical coordinates (radius, tilt, heading). A straight
+   * position lerp cuts through the scene and changes apparent speed as distance changes.
+   */
+  private flyCamera(
+    toPos: THREE.Vector3,
+    toTarget: THREE.Vector3,
+    done?: () => void,
+    onProgress?: (p: number) => void,
+    dur = 1.5,
+  ) {
     const fromTarget = this.controls.target.clone();
+    const from = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(fromTarget));
+    const to = new THREE.Spherical().setFromVector3(toPos.clone().sub(toTarget));
+    // take the short way round
+    let dTheta = to.theta - from.theta;
+    if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+    if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+    const tmp = new THREE.Spherical();
+    const off = new THREE.Vector3();
     this.controls.enabled = false;
     this.tweens.add(
-      1.0,
+      dur,
       (p) => {
-        this.camera.position.lerpVectors(fromPos, toPos, p);
         this.controls.target.lerpVectors(fromTarget, toTarget, p);
+        tmp.radius = from.radius + (to.radius - from.radius) * p;
+        tmp.phi = from.phi + (to.phi - from.phi) * p;
+        tmp.theta = from.theta + dTheta * p;
+        off.setFromSpherical(tmp);
+        this.camera.position.copy(this.controls.target).add(off);
         this.camera.lookAt(this.controls.target);
+        onProgress?.(p);
       },
-      { ease: ease, done: () => { this.controls.enabled = true; done?.(); } },
+      { ease: easeSmooth, done: () => { this.controls.enabled = true; done?.(); } },
     );
   }
 
@@ -284,9 +321,11 @@ export class WorldEngine {
     if (!pos) return;
     this.saleScene?.dispose();
     this.deliveryScene?.dispose();
+    this.roomScene?.dispose();
     this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     this.focusId = id;
-    this.setShopsHidden(true);
+    this.setShopsHidden(true, id);
+    let othersHidden = false;
     // drop map-level walkers/trucks so they don't wander through the interior
     for (const a of this.agents) this.disposeGroup(a.group);
     this.agents = [];
@@ -298,13 +337,14 @@ export class WorldEngine {
     this.scene.add(this.interior.group);
     this.saleScene = new SaleScene(this.interior, this.tweens, () => this.markDirty());
     this.deliveryScene = new DeliveryScene(this.interior, this.tweens, () => this.markDirty());
+    this.roomScene = new RoomScene(this.interior, this.tweens, () => this.markDirty());
 
     const target = pos.clone().add(new THREE.Vector3(0, 0.7, 0.9));
     // Pull back far enough that the whole shop fits in the part of the screen the drawer leaves free.
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
-    const fx = Math.max(0.2, (w - this.inset.right) / w);
-    const fy = Math.max(0.2, (h - this.inset.bottom) / h);
+    const fx = Math.max(0.2, (w - this.insetTo.right) / w);
+    const fy = Math.max(0.2, (h - this.insetTo.bottom) / h);
     const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const dist = Math.max(7.2 / (2 * t * ((w * fx) / (h * fy))), 6.4 / (2 * t * fy), 9);
     const dir = new THREE.Vector3(0, 5.6, 9.2).normalize();
@@ -316,6 +356,12 @@ export class WorldEngine {
       this.controls.maxAzimuthAngle = 0.6;
       this.controls.minPolarAngle = 0.7;
       this.controls.maxPolarAngle = 1.35;
+    }, (p) => {
+      // neighbours leave once they're out of the way, not on frame one
+      if (!othersHidden && p > 0.5) {
+        othersHidden = true;
+        this.setShopsHidden(true);
+      }
     });
     this.markDirty();
   }
@@ -325,6 +371,8 @@ export class WorldEngine {
     this.saleScene = null;
     this.deliveryScene?.dispose();
     this.deliveryScene = null;
+    this.roomScene?.dispose();
+    this.roomScene = null;
     this.tweens.clear();
     const room = this.interior;
     this.interior = null;
@@ -338,17 +386,21 @@ export class WorldEngine {
     this.controls.maxDistance = this.baseR * 2.6;
     const pose = this.mapPose ?? { pos: this.home.clone(), target: new THREE.Vector3() };
     const home = this.focusReturnId;
+    let revealed = false;
     this.flyCamera(pose.pos, pose.target, () => {
       if (home) this.setShopsHidden(false, home);
       if (room) this.disposeGroup(room.group);
       this.markDirty();
+    }, (p) => {
+      // bring the rest of the map back part-way out; this shop returns when we land
+      if (revealed || p < 0.3) return;
+      revealed = true;
+      for (const [sid, node] of this.shops) {
+        if (sid === home) continue;
+        node.group.visible = true;
+        node.group.traverse((o) => { if ((o as CSS2DObject).element) o.visible = true; });
+      }
     });
-    // reveal the rest of the map as we start flying out; this shop returns when we land
-    for (const [sid, node] of this.shops) {
-      if (sid === home) continue;
-      node.group.visible = true;
-      node.group.traverse((o) => { if ((o as CSS2DObject).element) o.visible = true; });
-    }
     this.markDirty();
   }
 
@@ -357,6 +409,7 @@ export class WorldEngine {
     cancelAnimationFrame(this.raf);
     this.saleScene?.dispose();
     this.deliveryScene?.dispose();
+    this.roomScene?.dispose();
     this.tweens.clear();
     this.resizeObs.disconnect();
     const dom = this.renderer.domElement;
@@ -528,20 +581,53 @@ export class WorldEngine {
     amountKES = 0,
     method?: "mpesa" | "cash",
   ) {
-    const APPROACH = 1.8, DWELL = 1.0, DEPART = 1.8, TOTAL = APPROACH + DWELL + DEPART;
+    if (!this.charsLoaded) {
+      void this.charsReady.then(() => {
+        if (!this.disposed) this.spawnCustomer(target, ambient, amountKES, method);
+      });
+      return;
+    }
+    const SPEED = 2.3, DWELL = 1.0;
+    const V = (x: number, z: number) => new THREE.Vector3(x, 0, z);
     const doorX = target.x, doorZ = target.z + 1.5;
-    const ox = (Math.random() - 0.5) * 3, ox2 = (Math.random() - 0.5) * 3;
-    const entryX = target.x + ox, exitX = target.x + ox2, laneZ = target.z + 9;
+    const laneZ = target.z + 9;
+    // Cross the street beside the parked delivery truck, then walk the pavement to the door.
+    const inSide = Math.random() < 0.5 ? -2.5 : 2.7;
+    const outSide = Math.random() < 0.5 ? -2.5 : 2.7;
+    const entryX = target.x + (Math.random() - 0.5) * 3;
+    const exitX = target.x + (Math.random() - 0.5) * 3;
+    const inPts = [V(entryX, laneZ), V(doorX + inSide, target.z + 5), V(doorX + inSide, target.z + 1.9), V(doorX, doorZ)];
+    const outPts = [V(doorX, doorZ), V(doorX + outSide, target.z + 1.9), V(doorX + outSide, target.z + 5), V(exitX, laneZ)];
+    const lenOf = (pts: THREE.Vector3[]) => pts.slice(1).reduce((n, p, i) => n + p.distanceTo(pts[i]), 0);
+    const inLen = lenOf(inPts), outLen = lenOf(outPts);
+    const pointAt = (pts: THREE.Vector3[], d: number, out: THREE.Vector3, dir: THREE.Vector3) => {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const seg = pts[i].distanceTo(pts[i + 1]);
+        if (d <= seg || i === pts.length - 2) {
+          const k = seg > 0 ? Math.min(1, d / seg) : 1;
+          out.lerpVectors(pts[i], pts[i + 1], k);
+          dir.subVectors(pts[i + 1], pts[i]);
+          return;
+        }
+        d -= seg;
+      }
+    };
     const color = ambient ? PAL.stone400 : method === "cash" ? PAL.stone600 : PAL.mpesa;
     const showCoin = !ambient && amountKES > 0;
 
     const g = new THREE.Group();
-    g.position.set(entryX, 0, laneZ);
+    g.position.copy(inPts[0]);
     g.userData = showCoin
       ? { kind: "customer", pickable: true, amountKES, method }
       : { kind: "customer", pickable: false };
-    g.add(mesh(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), color, [0, 0.42, 0]));
-    g.add(mesh(new THREE.SphereGeometry(0.15, 14, 12), PAL.stone300, [0, 0.84, 0]));
+    // a real person (rigged body), scaled to sit right beside the toy-scale shops
+    const person = makePerson({ skin: "#d9a47c", shirt: color });
+    person.group.scale.setScalar(0.9);
+    g.add(person.group);
+    // generous invisible hit area so tapping a person is easy
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.3, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    hit.position.y = 0.65;
+    g.add(hit);
 
     let coin: THREE.Mesh | null = null;
     let coinMat: THREE.MeshStandardMaterial | null = null;
@@ -555,36 +641,63 @@ export class WorldEngine {
       });
       coin = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.04, 16), coinMat);
       coin.rotation.x = Math.PI / 2;
-      coin.position.set(0, 1.1, 0);
+      coin.position.set(0, 1.4, 0);
       coin.visible = false;
       g.add(coin);
     }
     this.scene.add(g);
 
-    let t = 0;
+    let phase = 0; // 0 in, 1 at the door, 2 out
+    let s = 0, dwellT = 0;
+    const pos = new THREE.Vector3(), dir = new THREE.Vector3();
     this.agents.push({
       group: g,
       update: (dt) => {
-        t += dt;
-        let x: number, z: number, coinP = -1;
-        if (t < APPROACH) {
-          const p = easeInOut(t / APPROACH);
-          x = entryX + (doorX - entryX) * p;
-          z = laneZ + (doorZ - laneZ) * p;
-          g.rotation.y = Math.atan2(doorX - entryX, doorZ - laneZ);
-        } else if (t < APPROACH + DWELL) {
-          x = doorX; z = doorZ; coinP = (t - APPROACH) / DWELL;
-        } else if (t < TOTAL) {
-          const p = easeInOut((t - APPROACH - DWELL) / DEPART);
-          x = doorX + (exitX - doorX) * p;
-          z = doorZ + (laneZ - doorZ) * p;
-          g.rotation.y = Math.atan2(exitX - doorX, laneZ - doorZ);
-        } else return false;
-        g.position.set(x, Math.abs(Math.sin(t * 8)) * 0.04, z);
-        if (coin && coinMat) {
-          if (coinP >= 0) { coin.visible = true; coin.position.y = 1.1 + coinP * 0.7; coinMat.opacity = 1 - coinP; }
-          else coin.visible = false;
+        if (phase === 1) {
+          dwellT += dt;
+          const cp = Math.min(1, dwellT / DWELL);
+          person.walk(0, 0);
+          if (coin && coinMat) {
+            coin.visible = true;
+            coin.position.y = 1.4 + cp * 0.7;
+            coinMat.opacity = 1 - cp;
+          }
+          if (dwellT >= DWELL) {
+            phase = 2;
+            s = 0;
+            if (coin) coin.visible = false;
+          }
+          return true;
         }
+        const pts = phase === 0 ? inPts : outPts;
+        const total = phase === 0 ? inLen : outLen;
+        // never walk through a delivery truck: hold position until it has passed
+        pointAt(pts, Math.min(total, s + 0.9), pos, dir);
+        const blocked = this.agents.some((a) => {
+          if (a.group.userData.kind !== "truck") return false;
+          return Math.abs(pos.x - a.group.position.x) < 2.1 && Math.abs(pos.z - a.group.position.z) < 1.2;
+        });
+        if (blocked) {
+          person.walk(0, 0);
+          return true;
+        }
+        s += SPEED * dt;
+        if (s >= total) {
+          if (phase === 0) {
+            phase = 1;
+            g.position.copy(pts[pts.length - 1]);
+            g.rotation.y = Math.PI; // face the shop
+            return true;
+          }
+          return false;
+        }
+        pointAt(pts, s, pos, dir);
+        g.position.copy(pos);
+        const yaw = Math.atan2(dir.x, dir.z);
+        let dy = yaw - g.rotation.y;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        g.rotation.y += dy * Math.min(1, dt * 10);
+        person.walk(s / 0.38, 1);
         return true;
       },
     });
@@ -647,9 +760,31 @@ export class WorldEngine {
   }
 
   /** Shift the visible scene away from UI docked on the right/bottom. */
-  setInset(right: number, bottom: number) {
-    this.inset = { right, bottom };
-    this.applyInset();
+  setInset(right: number, bottom: number, animate = true) {
+    // already heading there (React re-applies on every render): don't restart the glide
+    if (animate && this.cancelInset && this.insetTo.right === right && this.insetTo.bottom === bottom) return;
+    this.cancelInset?.();
+    this.cancelInset = null;
+    this.insetTo = { right, bottom };
+    const from = { ...this.inset };
+    if (!animate || (from.right === right && from.bottom === bottom)) {
+      this.inset = { right, bottom };
+      this.applyInset();
+      this.markDirty();
+      return;
+    }
+    // Glide the framing offset alongside the camera so docking the drawer never snaps the scene sideways.
+    this.cancelInset = this.tweens.add(
+      1.1,
+      (p) => {
+        this.inset = {
+          right: from.right + (right - from.right) * p,
+          bottom: from.bottom + (bottom - from.bottom) * p,
+        };
+        this.applyInset();
+      },
+      { ease: easeSmooth, done: () => { this.cancelInset = null; } },
+    );
     this.markDirty();
   }
 

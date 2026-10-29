@@ -58,10 +58,10 @@ export function Inventory({ products }: { products: Product[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <div
-          className="section-h"
+          className="section-h toolbar"
           style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", marginBottom: 0 }}
         >
-          <div className="topsearch" style={{ width: 280, height: 38 }}>
+          <div className="topsearch toolbar-search" style={{ width: 280, height: 38 }}>
             <Icon name="search" size={16} />
             <input
               placeholder="Search inventory…"
@@ -69,7 +69,7 @@ export function Inventory({ products }: { products: Product[] }) {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="toolbar-actions" style={{ display: "flex", gap: 10 }}>
             <Btn
               variant="secondary"
               icon="receipt"
@@ -86,7 +86,7 @@ export function Inventory({ products }: { products: Product[] }) {
             >
               {isPendingNav && navTarget === "/inventory/receive" ? "Loading…" : "Receive stock"}
             </Btn>
-            <Btn variant="primary" icon="plus" onClick={() => setForm({ kind: "create" })}>
+            <Btn variant="primary" icon="plus" className="toolbar-primary" onClick={() => setForm({ kind: "create" })}>
               Add product
             </Btn>
           </div>
@@ -98,7 +98,7 @@ export function Inventory({ products }: { products: Product[] }) {
               : "No products match your search."}
           </div>
         ) : (
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Product</th>
@@ -124,11 +124,11 @@ export function Inventory({ products }: { products: Product[] }) {
                       <span style={{ fontWeight: 600 }}>{p.name}</span>
                     </div>
                   </td>
-                  <td><Badge kind="neutral">{p.cat}</Badge></td>
-                  <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>{KES(p.price)}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{p.stock}</td>
-                  <td>{stockBadge(p.stock)}</td>
-                  <td style={{ textAlign: "right" }}>
+                  <td data-label="Category"><Badge kind="neutral">{p.cat}</Badge></td>
+                  <td className="num" data-label="Price" style={{ textAlign: "right", fontWeight: 600 }}>{KES(p.price)}</td>
+                  <td className="num" data-label="In stock" style={{ textAlign: "right" }}>{p.stock}</td>
+                  <td data-label="Status">{stockBadge(p.stock)}</td>
+                  <td className="td-action" style={{ textAlign: "right" }}>
                     <button
                       className="iconbtn"
                       style={{ width: 32, height: 32, border: "none", background: "none" }}

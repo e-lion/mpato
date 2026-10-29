@@ -64,7 +64,7 @@ export function Suppliers({ suppliers }: { suppliers: Supplier[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <div
-          className="section-h"
+          className="section-h toolbar"
           style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", marginBottom: 0 }}
         >
           <div className="topsearch" style={{ width: 280, height: 38 }}>
@@ -86,7 +86,7 @@ export function Suppliers({ suppliers }: { suppliers: Supplier[] }) {
               : "No suppliers match your search."}
           </div>
         ) : (
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Supplier</th>
@@ -109,9 +109,11 @@ export function Suppliers({ suppliers }: { suppliers: Supplier[] }) {
                       <span style={{ fontWeight: 600 }}>{s.name}</span>
                     </div>
                   </td>
-                  <td style={{ color: "var(--fg2)" }}>{s.contact ?? "—"}</td>
-                  <td className="mono" style={{ color: "var(--fg2)" }}>{s.phone ?? "—"}</td>
+                  <td data-label="Contact" style={{ color: "var(--fg2)" }}>{s.contact ?? "—"}</td>
+                  <td className="mono" data-label="Phone" style={{ color: "var(--fg2)" }}>{s.phone ?? "—"}</td>
                   <td
+                    className="td-notes"
+                    data-label="Notes"
                     style={{
                       color: "var(--fg3)",
                       fontSize: 13,
@@ -123,7 +125,7 @@ export function Suppliers({ suppliers }: { suppliers: Supplier[] }) {
                   >
                     {s.notes ?? "—"}
                   </td>
-                  <td style={{ textAlign: "right" }}>
+                  <td className="td-action" style={{ textAlign: "right" }}>
                     <button
                       className="iconbtn"
                       style={{ width: 28, height: 28, border: "none", background: "none" }}

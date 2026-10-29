@@ -8,9 +8,16 @@ import {
   getSuppliers,
   getStockReceipts,
   getWalletBalance,
+  getDashboardStats,
+  getRecentSales,
+  getWeekSales,
+  getTopProducts,
   type StockReceiptListItem,
+  type DashboardStats,
+  type WeekDay,
+  type TopProduct,
 } from "@/lib/data/queries";
-import type { Customer, Product } from "@/lib/data/types";
+import type { Customer, Product, RecentSale } from "@/lib/data/types";
 import type { StoreSettings, Supplier } from "@/lib/data/queries";
 
 export type PosDrawerData =
@@ -51,4 +58,44 @@ export async function loadReceiveForWorld(storeId: string): Promise<ReceiveDrawe
 /** Shop wallet in whole shillings: all sales in, supplier payments out. */
 export async function getWalletKES(storeId: string): Promise<number> {
   return getWalletBalance(storeId);
+}
+
+export type DashboardRoomData =
+  | { ok: true; stats: DashboardStats; sales: RecentSale[]; week: WeekDay[]; topProducts: TopProduct[] }
+  | { ok: false; error: string };
+
+export async function loadDashboardForWorld(storeId: string): Promise<DashboardRoomData> {
+  const sw = await setActiveStore(storeId);
+  if (!sw.ok) return { ok: false, error: sw.error };
+  const [stats, sales, week, topProducts] = await Promise.all([
+    getDashboardStats(storeId),
+    getRecentSales(storeId, 6),
+    getWeekSales(storeId),
+    getTopProducts(storeId, 4),
+  ]);
+  return { ok: true, stats, sales, week, topProducts };
+}
+
+export type InventoryRoomData = { ok: true; products: Product[] } | { ok: false; error: string };
+
+export async function loadInventoryForWorld(storeId: string): Promise<InventoryRoomData> {
+  const sw = await setActiveStore(storeId);
+  if (!sw.ok) return { ok: false, error: sw.error };
+  return { ok: true, products: await getProducts(storeId) };
+}
+
+export type SuppliersRoomData = { ok: true; suppliers: Supplier[] } | { ok: false; error: string };
+
+export async function loadSuppliersForWorld(storeId: string): Promise<SuppliersRoomData> {
+  const sw = await setActiveStore(storeId);
+  if (!sw.ok) return { ok: false, error: sw.error };
+  return { ok: true, suppliers: await getSuppliers(storeId) };
+}
+
+export type CustomersRoomData = { ok: true; customers: Customer[] } | { ok: false; error: string };
+
+export async function loadCustomersForWorld(storeId: string): Promise<CustomersRoomData> {
+  const sw = await setActiveStore(storeId);
+  if (!sw.ok) return { ok: false, error: sw.error };
+  return { ok: true, customers: await getCustomers(storeId) };
 }
