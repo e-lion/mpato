@@ -356,6 +356,9 @@ export class RoomScene {
     if (!g) return;
     this.guest = null;
     g.stop();
+    // detach the label from the scene: removing only its element isn't enough, the label renderer
+    // re-attaches the element of anything still in the scene on the next frame
+    g.tag.removeFromParent();
     g.tag.element.remove();
     const a = this.room.anchors;
     const p = g.person;
