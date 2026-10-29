@@ -109,7 +109,7 @@ export function Topbar({ ctx }: { ctx: SessionContext | null }) {
       </button>
       {!isPos && (
         <Btn variant="primary" icon="plus" className="topbar-cta" onClick={() => router.push("/pos")}>
-          <span>New sale</span>
+          <span className="lbl">New sale</span>
         </Btn>
       )}
       <AccountMenu ctx={ctx} />

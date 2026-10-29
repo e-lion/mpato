@@ -370,7 +370,7 @@ body {
   .topbar .sub { display: none; }
   .topsearch { display: none; }
   .topbar-cta { width: 40px; padding: 0; flex: none; }
-  .topbar-cta span { display: none; }
+  .topbar-cta .lbl { display: none; }
 
   .content { padding: 16px 16px calc(32px + env(safe-area-inset-bottom)); }
 }
@@ -449,4 +449,34 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
   .content input, .content select, .content textarea { max-width: 100%; }
   .content input[type="date"] { min-width: 0; -webkit-appearance: none; appearance: none; background-color: var(--white); }
   .content .m-field { min-width: 0; }
+}
+
+/* ---------- Receive stock: line items become cards on phones ---------- */
+@media (max-width: 760px) {
+  .content .lines-card { overflow: visible !important; border: none !important; background: none; }
+  .content .lines-card .tbl-lines { min-width: 0; display: block; }
+  .tbl-lines thead { display: none; }
+  .tbl-lines tbody { display: grid; gap: 12px; }
+  .tbl-lines tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 12px;
+    padding: 16px; position: relative;
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg);
+  }
+  .tbl-lines tbody tr:hover { background: var(--white); }
+  .tbl-lines td { display: block; padding: 0; border: none; white-space: normal; }
+  .tbl-lines .td-product { grid-column: 1 / -1; padding-right: 44px; }
+  .tbl-lines td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 6px;
+    font-size: 12px; font-weight: 600; color: var(--fg2); text-align: left;
+  }
+  .tbl-lines .td-qty input, .tbl-lines .td-cost input { width: 100%; text-align: left !important; }
+  .tbl-lines .td-total {
+    grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between;
+    padding-top: 12px; border-top: 1px dashed var(--border);
+    font-family: var(--font-display); font-size: 17px;
+  }
+  .tbl-lines .td-total::before { margin: 0; font-family: var(--font-sans); }
+  .tbl-lines .td-remove { position: absolute; top: 14px; right: 12px; }
+  .tbl-lines .td-remove button { width: 36px; height: 36px; display: grid; place-items: center; }
+  .tbl-lines .td-product select { min-width: 0; }
 }
