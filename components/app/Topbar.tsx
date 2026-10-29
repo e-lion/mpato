@@ -3,6 +3,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { Btn } from "./primitives";
 import { AccountMenu } from "./AccountMenu";
+import { useMobileNav } from "./MobileNav";
 import type { SessionContext } from "@/lib/data/session";
 
 function greetingForHour(h: number): string {
@@ -79,10 +80,19 @@ export function Topbar({ ctx }: { ctx: SessionContext | null }) {
   const router = useRouter();
   const meta = titleFor(pathname, ctx);
   const isPos = pathname === "/pos";
+  const { setOpen } = useMobileNav();
 
   return (
     <header className="topbar">
-      <div>
+      <button
+        type="button"
+        className="iconbtn nav-burger"
+        aria-label="Open menu"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="menu" size={18} />
+      </button>
+      <div className="topbar-title">
         <h1>{meta.t}</h1>
         <div className="sub">{meta.s}</div>
       </div>
@@ -98,8 +108,8 @@ export function Topbar({ ctx }: { ctx: SessionContext | null }) {
         <span className="dot" />
       </button>
       {!isPos && (
-        <Btn variant="primary" icon="plus" onClick={() => router.push("/pos")}>
-          New sale
+        <Btn variant="primary" icon="plus" className="topbar-cta" onClick={() => router.push("/pos")}>
+          <span>New sale</span>
         </Btn>
       )}
       <AccountMenu ctx={ctx} />

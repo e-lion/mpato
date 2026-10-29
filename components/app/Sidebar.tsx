@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { StoreSwitcher } from "./StoreSwitcher";
+import { useMobileNav } from "./MobileNav";
 import { canAccess, type Role } from "@/lib/auth/access";
 import type { SessionContext } from "@/lib/data/session";
 
@@ -28,6 +29,7 @@ const MANAGE: NavItem[] = [
 
 export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
   const pathname = usePathname() ?? "";
+  const { setOpen: setMobileOpen } = useMobileNav();
 
   // Track which nav item the user clicked so we can show a spinner
   // until Next.js finishes streaming the new route. (Next 15.0.3 ships
@@ -103,6 +105,14 @@ export function Sidebar({ ctx }: { ctx: SessionContext | null }) {
           data-tip={collapsed ? "Expand" : undefined}
         >
           <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={18} />
+        </button>
+        <button
+          type="button"
+          className="sidebar-close"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close menu"
+        >
+          <Icon name="x" size={18} />
         </button>
       </div>
       {primary.map((it) => (

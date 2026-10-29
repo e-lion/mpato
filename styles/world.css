@@ -250,13 +250,44 @@
 }
 
 /* Phone: panel becomes a bottom sheet, HUD shrinks. */
+@media (max-width: 860px) {
+  /* .content is 16px-padded on phones; keep the stage edge-to-edge. */
+  .world-wrap { margin: -16px -16px calc(-32px - env(safe-area-inset-bottom)); height: calc(100dvh - 65px); }
+}
 @media (max-width: 640px) {
+  .world-hud { top: 12px; left: 12px; max-width: calc(100% - 24px); padding: 12px 14px; border-radius: var(--r-lg); }
+  .world-hud .big { font-size: 20px; margin: 2px 0; }
+  .world-hud .meta { margin-top: 4px; line-height: 1.4; }
+  .world-ctrl { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); gap: 10px; }
+  .world-ctrl button { width: 44px; height: 44px; }
+  .world-hint { display: none; }
+  .world-toast { bottom: calc(76px + env(safe-area-inset-bottom)); max-width: calc(100% - 32px); text-align: center; }
+
   .world-panel {
     top: auto; right: 0; left: 0; bottom: 0;
     width: auto;
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    border-bottom: 0;
+    max-height: 72%;
+    overflow-y: auto;
   }
-  .world-hud { max-width: calc(100% - 32px); }
+  .world-panel::before { content: ""; display: block; width: 36px; height: 4px; border-radius: 4px; background: var(--stone-200); margin: -8px auto 14px; }
+  .world-panel-h { gap: 14px; }
+  .world-panel-close { width: 36px; height: 36px; }
+  .world-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 18px 0 20px; border: 1px solid var(--border); border-radius: var(--r-lg); }
+  .world-stat { padding: 12px 14px; min-width: 0; }
+  .world-stat + .world-stat { border-left: 1px solid var(--border); }
+  .world-stat .v { font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+  .world-stat .k { margin-top: 4px; }
+  .world-actions { gap: 10px; }
+  .world-actions button { min-height: 48px; padding: 12px 14px; }
+
+  /* Selecting a shop (or stepping inside one) owns the bottom of the screen. */
+  .world-wrap:has(.world-panel) .world-ctrl,
+  .world-wrap:has(.world-drawer) .world-ctrl,
+  .world-wrap:has(.world-panel) .world-toast { display: none; }
+  .world-wrap:has(.world-panel) .world-hud { display: none; }
 }
 
 /* ---------- 3D layer (Phase 2) ---------- */
@@ -327,6 +358,15 @@
 .world-drawer-msg { padding: 32px; text-align: center; color: var(--fg3); font-size: 14px; }
 @media (max-width: 899px) {
   .world-drawer { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 55%; }
+}
+@media (max-width: 640px) {
+  .world-drawer { left: 0; right: 0; bottom: 0; height: 62%; border-radius: var(--r-2xl) var(--r-2xl) 0 0; border-bottom: 0; }
+  .world-drawer-h { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
+  .world-drawer-end { width: 100%; justify-content: space-between; }
+  .world-drawer-back { min-height: 36px; padding: 6px 14px; }
+  .world-drawer-body { padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); }
+  .world-drawer .cart { margin-top: 16px; }
+  .world-drawer-msg { padding: 28px 16px; }
 }
 
 /* floating "+KES" popping off the till */

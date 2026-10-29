@@ -88,7 +88,7 @@ export function StoreSwitcher({ ctx }: { ctx: SessionContext | null }) {
   }
 
   return (
-    <div ref={wrapRef} style={{ position: "relative" }}>
+    <div ref={wrapRef} className="menu-wrap">
       <button
         type="button"
         className="store-switch"
@@ -106,69 +106,51 @@ export function StoreSwitcher({ ctx }: { ctx: SessionContext | null }) {
       </button>
 
       {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 8px)",
-            left: 0,
-            right: 0,
-            background: "var(--white)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r-lg)",
-            boxShadow: "var(--shadow-md, var(--shadow-sm))",
-            padding: 6,
-            zIndex: 50,
-          }}
-        >
-          <div style={{ padding: "6px 8px", fontSize: 11.5, fontWeight: 700, color: "var(--fg3)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Your shops
+        <div role="menu" className="menu menu-stores">
+          <div className="menu-label">Your shops</div>
+          <div className="menu-list">
+            {stores.map((s) => {
+              const active = s.id === activeId;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="menuitem"
+                  className={"menu-item" + (active ? " active" : "")}
+                  onClick={() => switchTo(s.id)}
+                  disabled={isPending}
+                >
+                  <div className="av menu-store-av">{storeInitials(s.name)}</div>
+                  <div className="menu-id">
+                    <div className="menu-nm">{s.name}</div>
+                    <div className="menu-sub">
+                      {ROLE_LABEL[s.role]}
+                      {s.area ? `, ${s.area}` : ""}
+                    </div>
+                  </div>
+                  {active && <Icon name="check" size={16} color="var(--rose-700)" />}
+                </button>
+              );
+            })}
           </div>
-          {stores.map((s) => {
-            const active = s.id === activeId;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                role="menuitem"
-                className="acct-item"
-                onClick={() => switchTo(s.id)}
-                disabled={isPending}
-                style={{ ...itemStyle, width: "100%", background: active ? "var(--bg2, var(--rose-50))" : "none", border: "none" }}
-              >
-                <div className="av" style={{ width: 28, height: 28, fontSize: 12, flexShrink: 0 }}>
-                  {storeInitials(s.name)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--fg1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {s.name}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: "var(--fg3)" }}>
-                    {ROLE_LABEL[s.role]}
-                    {s.area ? ` · ${s.area}` : ""}
-                  </div>
-                </div>
-                {active && <Icon name="check" size={16} color="var(--rose-700)" />}
-              </button>
-            );
-          })}
 
-          <div style={{ height: 1, background: "var(--border)", margin: "6px 4px" }} />
+          <div className="menu-sep" />
 
-          <button
-            type="button"
-            role="menuitem"
-            className="acct-item"
-            onClick={() => {
-              setError(null);
-              setCreating(true);
-              setOpen(false);
-            }}
-            style={{ ...itemStyle, width: "100%", background: "none", border: "none" }}
-          >
-            <Icon name="plus" size={16} />
-            Create new shop
-          </button>
+          <div className="menu-list">
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-item"
+              onClick={() => {
+                setError(null);
+                setCreating(true);
+                setOpen(false);
+              }}
+            >
+              <Icon name="plus" size={17} />
+              Create new shop
+            </button>
+          </div>
         </div>
       )}
 
@@ -186,7 +168,7 @@ export function StoreSwitcher({ ctx }: { ctx: SessionContext | null }) {
               id="new-shop-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Mama Mboga — Thika"
+              placeholder="e.g. Mama Mboga Thika"
               required
               autoFocus
             />
@@ -204,12 +186,3 @@ export function StoreSwitcher({ ctx }: { ctx: SessionContext | null }) {
     </div>
   );
 }
-
-const itemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "8px 8px",
-  borderRadius: "var(--r-md)",
-  cursor: "pointer",
-};
