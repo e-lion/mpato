@@ -11,6 +11,8 @@ import type { WorldEvent } from "./types";
 import type { SaleSceneEvent, DeliverySceneEvent, RoomSceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
 import { RoomScene } from "./roomScene";
+import { Town } from "./town";
+import { Crowd } from "./crowd";
 import { Tweens, easeSmooth } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { preloadCharacter } from "./assets";
@@ -79,6 +81,10 @@ export class WorldEngine {
   private saleScene: SaleScene | null = null;
   private deliveryScene: DeliveryScene | null = null;
   private roomScene: RoomScene | null = null;
+  private town = new Town();
+  private crowd = new Crowd();
+  private crowdKey = "";
+  private skipFrame = false;
   private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private inset = { right: 0, bottom: 0 };
   /** Where the (animated) inset is heading; framing maths uses this, not the in-flight value. */
@@ -155,7 +161,7 @@ export class WorldEngine {
     this.scene.environmentIntensity = 0.18;
     pmrem.dispose();
 
-    // ground + grid
+    // ground (the town's roads, pavements and backdrop sit on top of it)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(260, 260),
       new THREE.MeshStandardMaterial({ color: PAL.stone100, roughness: 1 }),
@@ -164,10 +170,18 @@ export class WorldEngine {
     ground.position.y = -0.01;
     ground.receiveShadow = true;
     this.scene.add(ground);
-    const grid = new THREE.GridHelper(160, 80, new THREE.Color(PAL.stone300), new THREE.Color(PAL.stone200));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.5;
-    this.scene.add(grid);
+    this.scene.add(this.town.group);
+    this.scene.add(this.crowd.group);
+    this.crowd.freeze(this.reducedMotion);
+    // people wait for a delivery truck to pass instead of walking through it
+    this.crowd.setBlocker((x, z) =>
+      this.agents.some(
+        (a) =>
+          a.group.userData.kind === "truck" &&
+          Math.abs(x - a.group.position.x) < 1.7 &&
+          Math.abs(z - a.group.position.z) < 1.0,
+      ),
+    );
 
     // input
     const dom = this.renderer.domElement;
@@ -326,6 +340,9 @@ export class WorldEngine {
     this.focusId = id;
     this.setShopsHidden(true, id);
     let othersHidden = false;
+    // the interior brings its own street, so the town and its people step out of frame
+    this.town.setVisible(false);
+    this.crowd.setVisible(false);
     // drop map-level walkers/trucks so they don't wander through the interior
     for (const a of this.agents) this.disposeGroup(a.group);
     this.agents = [];
@@ -395,6 +412,8 @@ export class WorldEngine {
       // bring the rest of the map back part-way out; this shop returns when we land
       if (revealed || p < 0.3) return;
       revealed = true;
+      this.town.setVisible(true);
+      this.crowd.setVisible(true);
       for (const [sid, node] of this.shops) {
         if (sid === home) continue;
         node.group.visible = true;
@@ -410,6 +429,8 @@ export class WorldEngine {
     this.saleScene?.dispose();
     this.deliveryScene?.dispose();
     this.roomScene?.dispose();
+    this.crowd.dispose();
+    this.town.dispose();
     this.tweens.clear();
     this.resizeObs.disconnect();
     const dom = this.renderer.domElement;
@@ -443,6 +464,18 @@ export class WorldEngine {
         new THREE.Vector3((col - (cols - 1) / 2) * SP, 0, (row - (rows - 1) / 2) * SP),
       );
     });
+    this.town.build(cols, rows, SP);
+    // pavement lines the crowd strolls along: either side of every road, ringing every shop block
+    const key = `${cols}x${rows}x${n}`;
+    if (key !== this.crowdKey) {
+      this.crowdKey = key;
+      const xAt = (k: number) => (k - (cols - 1) / 2) * SP;
+      const zAt = (r: number) => (r - (rows - 1) / 2) * SP;
+      const xs: number[] = [], zs: number[] = [];
+      for (let k = -1; k < cols; k++) xs.push(xAt(k) + 1.8, xAt(k) + 4.2);
+      for (let r = -1; r < rows; r++) zs.push(zAt(r) + 1.7, zAt(r) + 4.05);
+      this.crowd.configure({ xs, zs }, Math.min(14, 4 + n * 3));
+    }
     const maxDim = Math.max(cols, rows);
     this.baseR = Math.max(10, maxDim * SP * 1.15);
     this.controls.maxDistance = this.baseR * 2.6;
@@ -484,30 +517,71 @@ export class WorldEngine {
       emissiveIntensity: 0,
       roughness: 0.92,
     });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, h, 2.4), wallMat);
-    body.position.y = h / 2;
-    group.add(body);
+    const std = (color: string, rough = 0.8) => new THREE.MeshStandardMaterial({ color, roughness: rough });
+    const add = (w: number, hh: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m);
+      mesh.position.set(x, y, z);
+      group.add(mesh);
+      return mesh;
+    };
+    const glass = new THREE.MeshStandardMaterial({ color: "#9fc4d6", roughness: 0.25, metalness: 0.1 });
+    const frame = std(PAL.stone300);
+    const brand = active ? PAL.ember : PAL.rose400;
+    let seed = 0;
+    for (const c of store.storeId) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
 
-    const roof = new THREE.Mesh(
-      new THREE.BoxGeometry(2.62, 0.24, 2.62),
-      new THREE.MeshStandardMaterial({ color: PAL.rose300, roughness: 0.75 }),
-    );
-    roof.position.y = h + 0.12;
-    group.add(roof);
+    // body on a plinth
+    add(2.5, 0.12, 2.5, std(PAL.stone400, 0.9), 0, 0.06, 0);
+    const body = add(2.4, h, 2.4, wallMat, 0, h / 2, 0);
+    void body;
 
-    const awning = new THREE.Mesh(
-      new THREE.BoxGeometry(2.42, 0.32, 0.1),
-      new THREE.MeshStandardMaterial({ color: active ? PAL.ember : PAL.rose400, roughness: 0.6 }),
-    );
-    awning.position.set(0, h * 0.8, 1.22);
-    group.add(awning);
+    // shopfront: two display windows either side of the door, framed
+    for (const sx of [-0.78, 0.78]) {
+      add(0.66, 0.6, 0.04, frame, sx, 0.66, 1.205);
+      add(0.56, 0.5, 0.05, glass, sx, 0.66, 1.21);
+    }
+    // upper floors get a row of windows on the front and both sides
+    for (let y = 1.55; y < h - 0.35; y += 0.7) {
+      for (const sx of [-0.78, 0, 0.78]) add(0.42, 0.4, 0.05, glass, sx, y, 1.205);
+      for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.4, 0.42, glass, sx * 1.205, y, sz);
+    }
+    for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.5, 0.42, glass, sx * 1.205, 0.8, sz);
 
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(0.62, 1.0, 0.06),
-      new THREE.MeshStandardMaterial({ color: PAL.stone400, roughness: 0.85 }),
-    );
-    door.position.set(0, 0.5, 1.21);
-    group.add(door);
+    // door with a frame and a step
+    add(0.7, 1.08, 0.05, frame, 0, 0.54, 1.205);
+    add(0.58, 0.98, 0.06, std(PAL.stone600, 0.85), 0, 0.5, 1.215);
+    add(0.8, 0.06, 0.3, std(PAL.stone300, 0.9), 0, 0.09, 1.36);
+
+    // striped awning, sloped, in the shop's brand colour
+    for (let i = 0; i < 6; i++) {
+      const seg = add(0.4, 0.05, 0.5, std(i % 2 ? "#f8f7f4" : brand, 0.6), -1 + i * 0.4 + 0.2, 1.3, 1.45);
+      seg.rotation.x = 0.32;
+    }
+    // sign board above the awning when the building is tall enough
+    if (h > 2.1) add(1.3, 0.28, 0.06, std(brand, 0.6), 0, Math.min(h - 0.4, 1.82), 1.23);
+
+    // roof: ledge, then a rooftop detail that differs per shop
+    add(2.62, 0.14, 2.62, std(PAL.stone300, 0.8), 0, h + 0.07, 0);
+    add(2.3, 0.04, 2.3, std(PAL.rose300, 0.75), 0, h + 0.16, 0);
+    const detail = seed % 3;
+    if (detail === 0) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), std("#8a95a5", 0.5));
+      tank.position.set(0.6, h + 0.42, -0.5);
+      group.add(tank);
+      add(0.5, 0.3, 0.5, frame, 0.6, h + 0.2, -0.5);
+    } else if (detail === 1) {
+      add(0.6, 0.3, 0.45, std("#a9a498", 0.6), -0.5, h + 0.33, -0.4);
+      add(0.4, 0.22, 0.3, std("#a9a498", 0.6), 0.5, h + 0.29, 0.3);
+    } else {
+      add(0.9, 0.5, 0.7, std(PAL.stone200), 0.4, h + 0.4, -0.5);
+      add(0.95, 0.05, 0.75, std(PAL.rose400), 0.4, h + 0.68, -0.5);
+    }
+
+    // a planter by the door
+    add(0.3, 0.2, 0.3, std("#8a6a47", 0.9), -1.0, 0.22, 1.45);
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), std("#5f9e63", 0.9));
+    bush.position.set(-1.0, 0.45, 1.45);
+    group.add(bush);
 
     if (store.lowStock > 0) {
       const pennant = new THREE.Mesh(
@@ -591,13 +665,13 @@ export class WorldEngine {
     const V = (x: number, z: number) => new THREE.Vector3(x, 0, z);
     const doorX = target.x, doorZ = target.z + 1.5;
     const laneZ = target.z + 9;
-    // Cross the street beside the parked delivery truck, then walk the pavement to the door.
-    const inSide = Math.random() < 0.5 ? -2.5 : 2.7;
-    const outSide = Math.random() < 0.5 ? -2.5 : 2.7;
-    const entryX = target.x + (Math.random() - 0.5) * 3;
-    const exitX = target.x + (Math.random() - 0.5) * 3;
-    const inPts = [V(entryX, laneZ), V(doorX + inSide, target.z + 5), V(doorX + inSide, target.z + 1.9), V(doorX, doorZ)];
-    const outPts = [V(doorX, doorZ), V(doorX + outSide, target.z + 1.9), V(doorX + outSide, target.z + 5), V(exitX, laneZ)];
+    // Walk down the pavement beside the shop (crossing the road on the zebra), then along the shopfront
+    // to the door. The pavement keeps clear of a parked delivery truck.
+    const inSide = Math.random() < 0.5 ? -1.8 : 1.8;
+    const outSide = Math.random() < 0.5 ? -1.8 : 1.8;
+    const jitter = () => (Math.random() - 0.5) * 0.3;
+    const inPts = [V(doorX + inSide + jitter(), laneZ), V(doorX + inSide, target.z + 1.7), V(doorX, doorZ)];
+    const outPts = [V(doorX, doorZ), V(doorX + outSide, target.z + 1.7), V(doorX + outSide + jitter(), laneZ)];
     const lenOf = (pts: THREE.Vector3[]) => pts.slice(1).reduce((n, p, i) => n + p.distanceTo(pts[i]), 0);
     const inLen = lenOf(inPts), outLen = lenOf(outPts);
     const pointAt = (pts: THREE.Vector3[], d: number, out: THREE.Vector3, dir: THREE.Vector3) => {
@@ -675,7 +749,7 @@ export class WorldEngine {
         pointAt(pts, Math.min(total, s + 0.9), pos, dir);
         const blocked = this.agents.some((a) => {
           if (a.group.userData.kind !== "truck") return false;
-          return Math.abs(pos.x - a.group.position.x) < 2.1 && Math.abs(pos.z - a.group.position.z) < 1.2;
+          return Math.abs(pos.x - a.group.position.x) < 1.7 && Math.abs(pos.z - a.group.position.z) < 1.0;
         });
         if (blocked) {
           person.walk(0, 0);
@@ -836,6 +910,15 @@ export class WorldEngine {
       if (Math.abs(cur - targetEmis) > 0.002) {
         node.wallMat.emissiveIntensity = cur + (targetEmis - cur) * Math.min(1, dt * 8);
         dirty = true;
+      }
+    }
+
+    // street life animates continuously, so when it's the only thing moving, draw every other frame
+    if (this.crowd.active) {
+      this.crowd.update(dt);
+      if (!dirty) {
+        this.skipFrame = !this.skipFrame;
+        dirty = !this.skipFrame;
       }
     }
 
