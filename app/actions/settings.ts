@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCurrentStoreId } from "@/lib/data/queries";
+import { requireRole, OWNER } from "@/lib/auth/guard";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -18,8 +18,9 @@ export async function updateStoreProfile(input: StoreProfileInput): Promise<Acti
   const area = input.area.trim();
   if (area.length > 80) return { ok: false, error: "Area is too long" };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(OWNER);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await (
@@ -56,8 +57,9 @@ export async function updatePaymentSettings(input: PaymentSettingsInput): Promis
     return { ok: false, error: "Invalid payment method" };
   }
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(OWNER);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await (
@@ -86,8 +88,9 @@ export async function updateReceiptSettings(input: ReceiptSettingsInput): Promis
   const footer = input.footer.trim();
   if (footer.length > 280) return { ok: false, error: "Footer must be 280 characters or fewer" };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(OWNER);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await (

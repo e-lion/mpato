@@ -1,72 +1,63 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { verifyWebhookSecret } from "@/lib/auth/webhook";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_TEXT = 4000;
 
 export async function POST(req: Request) {
+  if (!verifyWebhookSecret(req, "WHATSAPP_WEBHOOK_SECRET")) {
+    return NextResponse.json({ success: false }, { status: 401 });
+  }
+
   try {
     const payload = await req.json();
-    console.log("WhatsApp Webhook received:", JSON.stringify(payload, null, 2));
+    const { event, sessionId, data } = payload ?? {};
 
-    const { event, sessionId, data } = payload;
-    
-    // We only care about incoming messages
-    if (event === "whatsapp_message" && data?.message) {
-      const msg = data.message;
-      const key = msg.key;
-      
-      // If the message is from our own bot, ignore it (we save outbound manually for instant UI)
-      if (key.fromMe) {
-        return NextResponse.json({ success: true, ignored: true });
-      }
+    if (event !== "whatsapp_message" || !data?.message) {
+      return NextResponse.json({ success: true });
+    }
+    // The session id is the store id; never let a payload name a non-UUID.
+    if (typeof sessionId !== "string" || !UUID_RE.test(sessionId)) {
+      return NextResponse.json({ success: false, error: "bad session" }, { status: 400 });
+    }
 
-      // Extract phone number from "254712345678@s.whatsapp.net"
-      const remoteJid = key.remoteJid || "";
-      const phoneNumber = remoteJid.split("@")[0];
-      
-      // Extract the text
-      const textContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-      
-      if (phoneNumber && textContent) {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
-        // Find existing customer id
-        const possiblePhones = [phoneNumber];
-        if (phoneNumber.startsWith("254")) possiblePhones.push("0" + phoneNumber.substring(3));
-        if (phoneNumber.startsWith("0")) possiblePhones.push("254" + phoneNumber.substring(1));
+    const msg = data.message;
+    if (msg.key?.fromMe) return NextResponse.json({ success: true, ignored: true });
 
-        const { data: customerData } = await supabase
-          .from("mpato_customers")
-          .select("id, phone")
-          .eq("store_id", sessionId)
-          .in("phone", possiblePhones)
-          .limit(1)
-          .maybeSingle();
+    const phoneNumber = String(msg.key?.remoteJid ?? "").split("@")[0].replace(/\D/g, "");
+    const textContent = String(
+      msg.message?.conversation || msg.message?.extendedTextMessage?.text || "",
+    ).slice(0, MAX_TEXT);
 
-        const customerId = customerData ? (customerData as any).id : null;
-        const finalPhone = customerData ? (customerData as any).phone : phoneNumber;
+    if (phoneNumber && textContent) {
+      const supabase = createSupabaseAdminClient();
 
-        const { error } = await supabase.from("mpato_whatsapp_messages").insert({
-          store_id: sessionId,
-          customer_id: customerId,
-          phone_number: finalPhone,
-          direction: "inbound",
-          content: textContent,
-        });
+      const possiblePhones = [phoneNumber];
+      if (phoneNumber.startsWith("254")) possiblePhones.push("0" + phoneNumber.substring(3));
+      if (phoneNumber.startsWith("0")) possiblePhones.push("254" + phoneNumber.substring(1));
 
-        if (error) {
-          console.error("Webhook Supabase insert error:", error);
-        }
-      }
-    } else if (event === "connection_status") {
-      // Optional: Save connection status to a stores/settings table if needed
-      console.log(`Session ${sessionId} connection status: ${data.status}`);
+      const { data: customer } = await supabase
+        .from("mpato_customers")
+        .select("id, phone")
+        .eq("store_id", sessionId)
+        .in("phone", possiblePhones)
+        .limit(1)
+        .maybeSingle();
+
+      const { error } = await supabase.from("mpato_whatsapp_messages").insert({
+        store_id: sessionId,
+        customer_id: customer?.id ?? null,
+        phone_number: customer?.phone ?? phoneNumber,
+        direction: "inbound",
+        content: textContent,
+      });
+      if (error) console.error("WhatsApp webhook insert error:", error.message);
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("WhatsApp webhook error", err);
-    // Return 200 so the worker doesn't endlessly retry bad payloads
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 200 });
+    console.error("WhatsApp webhook error", err instanceof Error ? err.message : err);
+    return NextResponse.json({ success: false }, { status: 200 });
   }
 }

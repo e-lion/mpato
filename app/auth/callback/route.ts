@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/auth/safe-redirect";
 import { onboardUser, type RpcFn } from "@/lib/auth/onboarding";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/dashboard";
+  const next = safeNext(url.searchParams.get("next"));
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing_code", url.origin));
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    const params = new URLSearchParams({ error: error.message });
+    const params = new URLSearchParams({ error: "Sign-in failed. Please try again." });
     return NextResponse.redirect(new URL(`/login?${params}`, url.origin));
   }
 

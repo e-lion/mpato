@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { claimInvite, type RpcFn } from "@/lib/auth/onboarding";
+import { safeNext } from "@/lib/auth/safe-redirect";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 
 function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/dashboard";
+  const next = safeNext(params.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

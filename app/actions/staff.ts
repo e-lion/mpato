@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStoreId } from "@/lib/data/queries";
+import { requireRole, MANAGE } from "@/lib/auth/guard";
 import type { StaffRole } from "@/lib/data/queries";
 
 export type StaffInput = {
@@ -34,8 +35,9 @@ export async function createStaff(input: StaffInput): Promise<ActionResult> {
   const err = validate(input);
   if (err) return { ok: false, error: err };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const row = {
@@ -58,8 +60,9 @@ export async function updateStaff(id: string, input: StaffInput): Promise<Action
   const err = validate(input);
   if (err) return { ok: false, error: err };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const patch = {
@@ -91,8 +94,9 @@ export async function updateStaff(id: string, input: StaffInput): Promise<Action
 }
 
 export async function deleteStaff(id: string): Promise<ActionResult> {
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   // Revoke store access for the linked account (if any) and delete the row.
