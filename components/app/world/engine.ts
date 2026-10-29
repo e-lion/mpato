@@ -10,7 +10,7 @@ import type { WorldStore } from "@/lib/data/queries";
 import type { WorldEvent } from "./types";
 import type { SaleSceneEvent, DeliverySceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
-import { Tweens, easeInOut as ease } from "./tween";
+import { Tweens, easeSmooth } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { preloadCharacter } from "./assets";
 import { updatePeople } from "./people";
@@ -76,6 +76,9 @@ export class WorldEngine {
   private deliveryScene: DeliveryScene | null = null;
   private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private inset = { right: 0, bottom: 0 };
+  /** Where the (animated) inset is heading; framing maths uses this, not the in-flight value. */
+  private insetTo = { right: 0, bottom: 0 };
+  private cancelInset: (() => void) | null = null;
   private resizeObs: ResizeObserver;
   private downAt: { x: number; y: number } | null = null;
 
@@ -264,18 +267,41 @@ export class WorldEngine {
     }
   }
 
-  private flyCamera(toPos: THREE.Vector3, toTarget: THREE.Vector3, done?: () => void) {
-    const fromPos = this.camera.position.clone();
+  /**
+   * Glide the camera on an orbit-style arc: the look-at point travels in a line while the
+   * camera swings around it in spherical coordinates (radius, tilt, heading). A straight
+   * position lerp cuts through the scene and changes apparent speed as distance changes.
+   */
+  private flyCamera(
+    toPos: THREE.Vector3,
+    toTarget: THREE.Vector3,
+    done?: () => void,
+    onProgress?: (p: number) => void,
+    dur = 1.5,
+  ) {
     const fromTarget = this.controls.target.clone();
+    const from = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(fromTarget));
+    const to = new THREE.Spherical().setFromVector3(toPos.clone().sub(toTarget));
+    // take the short way round
+    let dTheta = to.theta - from.theta;
+    if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+    if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+    const tmp = new THREE.Spherical();
+    const off = new THREE.Vector3();
     this.controls.enabled = false;
     this.tweens.add(
-      1.0,
+      dur,
       (p) => {
-        this.camera.position.lerpVectors(fromPos, toPos, p);
         this.controls.target.lerpVectors(fromTarget, toTarget, p);
+        tmp.radius = from.radius + (to.radius - from.radius) * p;
+        tmp.phi = from.phi + (to.phi - from.phi) * p;
+        tmp.theta = from.theta + dTheta * p;
+        off.setFromSpherical(tmp);
+        this.camera.position.copy(this.controls.target).add(off);
         this.camera.lookAt(this.controls.target);
+        onProgress?.(p);
       },
-      { ease: ease, done: () => { this.controls.enabled = true; done?.(); } },
+      { ease: easeSmooth, done: () => { this.controls.enabled = true; done?.(); } },
     );
   }
 
@@ -286,7 +312,8 @@ export class WorldEngine {
     this.deliveryScene?.dispose();
     this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     this.focusId = id;
-    this.setShopsHidden(true);
+    this.setShopsHidden(true, id);
+    let othersHidden = false;
     // drop map-level walkers/trucks so they don't wander through the interior
     for (const a of this.agents) this.disposeGroup(a.group);
     this.agents = [];
@@ -303,8 +330,8 @@ export class WorldEngine {
     // Pull back far enough that the whole shop fits in the part of the screen the drawer leaves free.
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
-    const fx = Math.max(0.2, (w - this.inset.right) / w);
-    const fy = Math.max(0.2, (h - this.inset.bottom) / h);
+    const fx = Math.max(0.2, (w - this.insetTo.right) / w);
+    const fy = Math.max(0.2, (h - this.insetTo.bottom) / h);
     const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const dist = Math.max(7.2 / (2 * t * ((w * fx) / (h * fy))), 6.4 / (2 * t * fy), 9);
     const dir = new THREE.Vector3(0, 5.6, 9.2).normalize();
@@ -316,6 +343,12 @@ export class WorldEngine {
       this.controls.maxAzimuthAngle = 0.6;
       this.controls.minPolarAngle = 0.7;
       this.controls.maxPolarAngle = 1.35;
+    }, (p) => {
+      // neighbours leave once they're out of the way, not on frame one
+      if (!othersHidden && p > 0.5) {
+        othersHidden = true;
+        this.setShopsHidden(true);
+      }
     });
     this.markDirty();
   }
@@ -338,17 +371,21 @@ export class WorldEngine {
     this.controls.maxDistance = this.baseR * 2.6;
     const pose = this.mapPose ?? { pos: this.home.clone(), target: new THREE.Vector3() };
     const home = this.focusReturnId;
+    let revealed = false;
     this.flyCamera(pose.pos, pose.target, () => {
       if (home) this.setShopsHidden(false, home);
       if (room) this.disposeGroup(room.group);
       this.markDirty();
+    }, (p) => {
+      // bring the rest of the map back part-way out; this shop returns when we land
+      if (revealed || p < 0.3) return;
+      revealed = true;
+      for (const [sid, node] of this.shops) {
+        if (sid === home) continue;
+        node.group.visible = true;
+        node.group.traverse((o) => { if ((o as CSS2DObject).element) o.visible = true; });
+      }
     });
-    // reveal the rest of the map as we start flying out; this shop returns when we land
-    for (const [sid, node] of this.shops) {
-      if (sid === home) continue;
-      node.group.visible = true;
-      node.group.traverse((o) => { if ((o as CSS2DObject).element) o.visible = true; });
-    }
     this.markDirty();
   }
 
@@ -647,9 +684,31 @@ export class WorldEngine {
   }
 
   /** Shift the visible scene away from UI docked on the right/bottom. */
-  setInset(right: number, bottom: number) {
-    this.inset = { right, bottom };
-    this.applyInset();
+  setInset(right: number, bottom: number, animate = true) {
+    // already heading there (React re-applies on every render): don't restart the glide
+    if (animate && this.cancelInset && this.insetTo.right === right && this.insetTo.bottom === bottom) return;
+    this.cancelInset?.();
+    this.cancelInset = null;
+    this.insetTo = { right, bottom };
+    const from = { ...this.inset };
+    if (!animate || (from.right === right && from.bottom === bottom)) {
+      this.inset = { right, bottom };
+      this.applyInset();
+      this.markDirty();
+      return;
+    }
+    // Glide the framing offset alongside the camera so docking the drawer never snaps the scene sideways.
+    this.cancelInset = this.tweens.add(
+      1.1,
+      (p) => {
+        this.inset = {
+          right: from.right + (right - from.right) * p,
+          bottom: from.bottom + (bottom - from.bottom) * p,
+        };
+        this.applyInset();
+      },
+      { ease: easeSmooth, done: () => { this.cancelInset = null; } },
+    );
     this.markDirty();
   }
 
