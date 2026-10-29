@@ -442,8 +442,8 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
 
 @media (max-width: 760px) {
   /* Wide tables scroll inside their card instead of spilling past the page. */
-  .content .card:has(> .tbl):not(.lines-card) { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-  .content .card:has(> .tbl):not(.lines-card) .tbl { min-width: 560px; }
+  .content .card:has(> .tbl):not(.lines-card):not(:has(> .tbl-stack)) { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .content .card:has(> .tbl):not(.lines-card):not(:has(> .tbl-stack)) .tbl { min-width: 560px; }
   .content td input:not([type="checkbox"]):not([type="radio"]) { height: 44px; font-size: 16px; }
   /* Date and text fields never exceed their grid cell. */
   .content input, .content select, .content textarea { max-width: 100%; }
@@ -491,4 +491,19 @@ select option { font-size: 14px; color: var(--fg1); background: var(--white); pa
   .content .toolbar-actions { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px !important; }
   .content .toolbar-actions .btn { height: 44px; padding: 0 12px; min-width: 0; }
   .content .toolbar-actions .toolbar-primary { grid-column: 1 / -1; }
+}
+
+/* ---------- Stacked tables: each row becomes a labelled card on phones (add data-label to cells) ---------- */
+@media (max-width: 760px) {
+  .tbl-stack, .tbl-stack tbody { display: block; width: 100%; }
+  .tbl-stack thead { display: none; }
+  .tbl-stack tr { display: block; position: relative; padding: 16px; border-bottom: 1px solid var(--border); }
+  .tbl-stack tbody tr:last-child { border-bottom: none; }
+  .tbl-stack td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border: none; white-space: normal; }
+  .tbl-stack td:first-child { padding: 0 44px 12px 0; }
+  .tbl-stack td[data-label] { border-top: 1px dashed var(--border); }
+  .tbl-stack td[data-label]::before { content: attr(data-label); font-size: 13px; font-weight: 500; color: var(--fg3); }
+  .tbl-stack td[data-label]:nth-child(2) { margin-top: 0; }
+  .tbl-stack .td-action { position: absolute; top: 12px; right: 10px; padding: 0; border: none !important; }
+  .tbl-stack .td-action .iconbtn { width: 40px !important; height: 40px !important; }
 }

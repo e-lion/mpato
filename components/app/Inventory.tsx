@@ -98,7 +98,7 @@ export function Inventory({ products }: { products: Product[] }) {
               : "No products match your search."}
           </div>
         ) : (
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Product</th>
@@ -124,11 +124,11 @@ export function Inventory({ products }: { products: Product[] }) {
                       <span style={{ fontWeight: 600 }}>{p.name}</span>
                     </div>
                   </td>
-                  <td><Badge kind="neutral">{p.cat}</Badge></td>
-                  <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>{KES(p.price)}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{p.stock}</td>
-                  <td>{stockBadge(p.stock)}</td>
-                  <td style={{ textAlign: "right" }}>
+                  <td data-label="Category"><Badge kind="neutral">{p.cat}</Badge></td>
+                  <td className="num" data-label="Price" style={{ textAlign: "right", fontWeight: 600 }}>{KES(p.price)}</td>
+                  <td className="num" data-label="In stock" style={{ textAlign: "right" }}>{p.stock}</td>
+                  <td data-label="Status">{stockBadge(p.stock)}</td>
+                  <td className="td-action" style={{ textAlign: "right" }}>
                     <button
                       className="iconbtn"
                       style={{ width: 32, height: 32, border: "none", background: "none" }}
