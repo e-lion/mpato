@@ -1,6 +1,7 @@
 "use client";
 
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { PAL } from "./palette";
@@ -98,6 +99,8 @@ export class WorldEngine {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.setSize(w, h);
+    this.renderer.toneMapping = THREE.NeutralToneMapping; // keeps the brand palette, softens highlights
+    this.renderer.toneMappingExposure = 0.9;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
@@ -138,6 +141,11 @@ export class WorldEngine {
     this.scene.add(dir);
     this.sun = dir;
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+    // soft image-based light so textured skin/cloth and glossy materials read as real
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.18;
+    pmrem.dispose();
 
     // ground + grid
     const ground = new THREE.Mesh(

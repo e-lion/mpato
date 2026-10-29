@@ -71,15 +71,14 @@ export function makePerson(look: {
 function makeRiggedPerson(tpl: CharacterTemplate, shirt: string): Person {
   const group = new THREE.Group();
   const model = cloneSkinned(tpl.scene) as THREE.Group;
-  const k = 1.15 / 1.81; // character is ~1.81 m; the shop is built at toy scale
-  model.scale.multiplyScalar(k);
+  model.scale.multiplyScalar(1.15 / tpl.height); // shop is built at toy scale; normalise body height
   group.add(model);
 
   // Tint the body surface per person; give each person their own materials.
   const body = new THREE.Color(shirt);
   model.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (!m.isMesh) return;
+    if (!m.isMesh || !tpl.tintable) return;
     const mats = Array.isArray(m.material) ? m.material : [m.material];
     const own = mats.map((mat) => {
       const c = (mat as THREE.MeshStandardMaterial).clone();
@@ -92,6 +91,23 @@ function makeRiggedPerson(tpl: CharacterTemplate, shirt: string): Person {
     });
     m.material = Array.isArray(m.material) ? own : own[0];
   });
+
+  if (!tpl.tintable) {
+    // Textured bodies can't be recoloured, so vary height and give each a slight colour cast.
+    model.scale.multiplyScalar(0.94 + Math.random() * 0.12);
+    const cast = new THREE.Color(["#ffffff", "#f3e9dc", "#e6eefc", "#fbe6e6", "#e8f5e6"][Math.floor(Math.random() * 5)]);
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const own = (Array.isArray(m.material) ? m.material : [m.material]).map((mat) => {
+        const c = (mat as THREE.MeshStandardMaterial).clone();
+        c.color.multiply(cast);
+        return c;
+      });
+      m.material = Array.isArray(m.material) ? own : own[0];
+    });
+    return makePosedPerson(group, model);
+  }
 
   const mixer = new THREE.AnimationMixer(model);
   const find = (re: RegExp) => tpl.clips.find((c) => re.test(c.name));
@@ -214,4 +230,95 @@ export function makeProceduralPerson(look: {
       handLocal.set(0.21, 0.88 - 0.4 * Math.cos(v * 1.35), 0.4 * Math.sin(v * 1.35));
     },
   };
+}
+
+/**
+ * Poses a textured Mixamo body by driving its bones directly. These bodies ship in a
+ * T-pose with no walk/idle clips of their own, so: arms down, legs and arms swing while
+ * walking, and the right arm can reach forward for hand-overs. Rotations are defined in
+ * the model's own space (y up, +z forward), so they survive the person turning in the shop.
+ */
+function makePosedPerson(group: THREE.Group, model: THREE.Group): Person {
+  model.updateWorldMatrix(true, true);
+  const bone = (n: string) => model.getObjectByName("mixamorig" + n) ?? model.getObjectByName("mixamorig:" + n) ?? null;
+
+  const qInModel = (o: THREE.Object3D) => {
+    const q = new THREE.Quaternion();
+    for (let n: THREE.Object3D | null = o; n && n !== model; n = n.parent) q.premultiply(n.quaternion);
+    return q;
+  };
+  const posInModel = (o: THREE.Object3D) => model.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+
+  type Joint = { b: THREE.Object3D; rest: THREE.Quaternion; dir: THREE.Vector3 | null };
+  const joint = (name: string, childName?: string): Joint | null => {
+    const b = bone(name);
+    if (!b) return null;
+    const c = childName ? bone(childName) : null;
+    const dir = c ? posInModel(c).sub(posInModel(b)).normalize() : null;
+    return { b, rest: qInModel(b), dir };
+  };
+
+  const lArm = joint("LeftArm", "LeftForeArm");
+  const rArm = joint("RightArm", "RightForeArm");
+  const lUp = joint("LeftUpLeg");
+  const rUp = joint("RightUpLeg");
+  const lKnee = joint("LeftLeg");
+  const rKnee = joint("RightLeg");
+  const spine = joint("Spine");
+
+  // Apply a model-space rotation `delta` on top of a joint's rest orientation.
+  const apply = (j: Joint | null, delta: THREE.Quaternion) => {
+    if (!j) return;
+    const parent = j.b.parent ? qInModel(j.b.parent) : new THREE.Quaternion();
+    j.b.quaternion.copy(parent.invert().multiply(delta.multiply(j.rest)));
+    j.b.updateMatrix();
+  };
+  const pointArm = (j: Joint | null, target: THREE.Vector3) => {
+    if (!j?.dir) return;
+    apply(j, new THREE.Quaternion().setFromUnitVectors(j.dir, target.normalize()));
+  };
+  const rotX = (a: number) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a);
+
+  const outL = lArm?.dir ? Math.sign(lArm.dir.x) || -1 : -1;
+  const outR = rArm?.dir ? Math.sign(rArm.dir.x) || 1 : 1;
+
+  let amt = 0;
+  let phase = Math.random() * 6;
+  let time = Math.random() * 10;
+  let reachV = 0;
+  const tmp = new THREE.Vector3();
+
+  const handLocal = new THREE.Vector3();
+  const person: Person = {
+    group,
+    handLocal,
+    walk: (_p, a) => {
+      amt = a;
+    },
+    reach: (v) => {
+      reachV = v;
+      handLocal.set(0.21, 0.95, 0.15 + 0.3 * v);
+    },
+    update: (dt) => {
+      time += dt;
+      phase += dt * 9 * amt;
+      const s = Math.sin(phase) * amt;
+      const sway = Math.sin(time * 1.6) * 0.025 * (1 - amt);
+
+      // legs: thigh swings (forward = negative about +x), knee flexes backwards
+      apply(lUp, rotX(-s * 0.55));
+      apply(rUp, rotX(s * 0.55));
+      apply(lKnee, rotX(Math.max(0, Math.cos(phase)) * 0.7 * amt));
+      apply(rKnee, rotX(Math.max(0, -Math.cos(phase)) * 0.7 * amt));
+      apply(spine, rotX(sway));
+
+      // arms: hang down, counter-swing against the legs
+      pointArm(lArm, tmp.set(outL * 0.1, -1, s * 0.4 + sway));
+      const r = reachV;
+      pointArm(rArm, tmp.set(outR * 0.1 * (1 - r), -1 * (1 - r) - 0.15 * r, -s * 0.4 * (1 - r) + 1.0 * r + sway));
+    },
+  };
+  person.update?.(0);
+  live.add(person);
+  return person;
 }

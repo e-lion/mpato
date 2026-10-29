@@ -48,37 +48,64 @@ export function fitModel(model: THREE.Object3D, length: number) {
   return size.x >= size.z; // true when the model's long axis is already x
 }
 
-// ---- rigged character template (public/models/character.glb) ----------------
+// ---- rigged characters ---------------------------------------------------------
+// public/models/character.glb (animated mannequin) is the fallback body. Any
+// Mixamo-rigged .glb in public/models/people/ (michelle.glb, person-1.glb ...
+// person-6.glb) is used instead as a more realistic body; its bones are posed in
+// code (arms down, walk swing, hand-over), so it needs no animation clips.
 
-export type CharacterTemplate = { scene: THREE.Group; clips: THREE.AnimationClip[] };
-let character: CharacterTemplate | null = null;
+export type CharacterTemplate = {
+  scene: THREE.Group;
+  clips: THREE.AnimationClip[];
+  height: number; // model height in its own units
+  tintable: boolean; // plain mannequin: tint per person; textured bodies are left alone
+};
+let templates: CharacterTemplate[] = [];
 let characterLoading: Promise<void> | null = null;
 
-/** Start loading the shared character rig; resolves once (or never errors). */
+const VARIANTS = ["michelle", "person-1", "person-2", "person-3", "person-4", "person-5", "person-6"].map(
+  (n) => `/models/people/${n}.glb`,
+);
+
+async function loadRaw(url: string) {
+  try {
+    const head = await fetch(url, { method: "HEAD" });
+    const type = head.headers.get("content-type") ?? "";
+    if (!head.ok || type.includes("text/html")) return null;
+    loader ??= new GLTFLoader();
+    const gltf = await loader.loadAsync(url);
+    gltf.scene.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+        (o as THREE.Mesh).frustumCulled = false; // skinned bounds are unreliable
+      }
+    });
+    gltf.scene.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    return { gltf, height: Math.max(0.1, box.max.y - box.min.y) };
+  } catch {
+    return null;
+  }
+}
+
+/** Start loading the characters; resolves once (never rejects). */
 export function preloadCharacter(): Promise<void> {
   characterLoading ??= (async () => {
-    try {
-      const head = await fetch("/models/character.glb", { method: "HEAD" });
-      const type = head.headers.get("content-type") ?? "";
-      if (!head.ok || type.includes("text/html")) return;
-      loader ??= new GLTFLoader();
-      const gltf = await loader.loadAsync("/models/character.glb");
-      gltf.scene.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
-          (o as THREE.Mesh).frustumCulled = false; // skinned bounds are unreliable
-        }
-      });
-      character = { scene: gltf.scene, clips: gltf.animations };
-    } catch {
-      /* fall back to the procedural person */
-    }
+    const base = await loadRaw("/models/character.glb");
+    if (!base) return;
+    const clips = base.gltf.animations;
+    const baseTpl: CharacterTemplate = { scene: base.gltf.scene, clips, height: base.height, tintable: true };
+    const extra = (await Promise.all(VARIANTS.map(loadRaw)))
+      .filter((r): r is NonNullable<typeof r> => !!r)
+      // textured bodies have no clips of their own; people.ts poses their bones directly
+      .map<CharacterTemplate>((r) => ({ scene: r.gltf.scene, clips: [], height: r.height, tintable: false }));
+    templates = extra.length ? extra : [baseTpl];
   })();
   return characterLoading;
 }
 
-/** Sync access: null until preloadCharacter() has finished (or if the file is missing). */
+/** Sync: a random loaded character, or null until loaded / if no model files exist. */
 export function getCharacter(): CharacterTemplate | null {
-  return character;
+  return templates.length ? templates[Math.floor(Math.random() * templates.length)] : null;
 }

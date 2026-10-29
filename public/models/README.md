@@ -12,3 +12,11 @@ to the procedural model, so you can add them one at a time.
 Planned next: `shelf.glb`, `counter.glb`.
 
 Keep the total under ~5 MB. Record each pack's author and license in `LICENSES.md`.
+
+## More realistic people
+
+Any Mixamo-rigged `.glb` in `people/` is used instead of the mannequin: `michelle.glb`
+is there now, and the loader also looks for `person-1.glb` ... `person-6.glb`. Export
+characters from mixamo.com (free Adobe account) as FBX/GLB with the standard
+`mixamorig` skeleton, in T-pose; walking and idling are posed in code, so no animation
+clips are needed. With several files, each person picks one at random.
