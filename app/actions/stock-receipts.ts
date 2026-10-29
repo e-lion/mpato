@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCurrentStoreId } from "@/lib/data/queries";
+import { requireRole, MANAGE } from "@/lib/auth/guard";
 
 export type ReceiveStockInput = {
   supplierId: string | null;
@@ -40,8 +40,9 @@ export async function receiveStock(
     }
   }
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,8 +109,17 @@ export async function recordSupplierPayment(
     reference: string;
   }
 ) {
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
+
+  // Exported server action: never trust the amount. Positive whole cents only.
+  if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0) {
+    return { ok: false, error: "Payment amount must be greater than 0" };
+  }
+  if (input.method !== "cash" && input.method !== "mpesa") {
+    return { ok: false, error: "Invalid payment method" };
+  }
 
   const supabase = await createSupabaseServerClient();
   
@@ -138,6 +148,10 @@ export async function recordSupplierPayment(
 
   if (pErr) return { ok: false, error: pErr.message };
 
+  const outstanding = Number(receipt.total_cost_cents) - Number(receipt.amount_paid_cents);
+  if (input.amountCents > outstanding) {
+    return { ok: false, error: "Payment exceeds the amount still owed" };
+  }
   const newAmountPaid = Number(receipt.amount_paid_cents) + input.amountCents;
   const newStatus = newAmountPaid >= Number(receipt.total_cost_cents) ? "paid" : (newAmountPaid > 0 ? "partial" : "unpaid");
 

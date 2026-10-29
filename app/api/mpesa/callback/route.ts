@@ -1,52 +1,53 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { verifyWebhookSecret } from "@/lib/auth/webhook";
+
+type StkItem = { Name?: string; Value?: unknown };
+
+const RECEIPT_RE = /^[A-Z0-9]{6,12}$/;
+const CHECKOUT_RE = /^[A-Za-z0-9_-]{8,100}$/;
 
 export async function POST(req: Request) {
+  // The callback URL carries a secret token (see initiateStkPush); anything
+  // without it is not from our payment gateway.
+  if (!verifyWebhookSecret(req, "MPESA_CALLBACK_SECRET")) {
+    return NextResponse.json({ success: false }, { status: 401 });
+  }
+
   try {
     const data = await req.json();
-    console.log("NovaPay Webhook received:", JSON.stringify(data, null, 2));
-    
-    if (data.success && data.checkoutRequestID && data.receiptNumber) {
-      // NovaPay Clean Format
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      
-      await supabase.from("mpato_payments_transactions").upsert({
-        checkout_request_id: data.checkoutRequestID,
-        receipt_number: data.receiptNumber
-      });
-    } else if (data?.Body?.stkCallback) {
-      // Raw Safaricom Daraja Format
-      const stkCallback = data.Body.stkCallback;
-      const checkoutRequestId = stkCallback.CheckoutRequestID;
-      const resultCode = stkCallback.ResultCode;
-      
-      if (resultCode === 0) {
-        const items = stkCallback.CallbackMetadata?.Item || [];
-        const receiptItem = items.find((item: any) => item.Name === "MpesaReceiptNumber");
-        const mpesaReceiptNumber = receiptItem?.Value;
-        
-        if (checkoutRequestId && mpesaReceiptNumber) {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-          const supabase = createClient(supabaseUrl, supabaseKey);
-          
-          const { error } = await supabase.from("mpato_payments_transactions").upsert({
-            checkout_request_id: checkoutRequestId,
-            receipt_number: mpesaReceiptNumber
-          });
-          if (error) {
-            console.error("Webhook Supabase upsert error:", error);
-          }
-        }
-      }
+
+    let checkoutRequestId: unknown;
+    let receipt: unknown;
+
+    if (data?.success && data.checkoutRequestID && data.receiptNumber) {
+      // NovaPay clean format
+      checkoutRequestId = data.checkoutRequestID;
+      receipt = data.receiptNumber;
+    } else if (data?.Body?.stkCallback?.ResultCode === 0) {
+      // Raw Safaricom Daraja format
+      const cb = data.Body.stkCallback;
+      checkoutRequestId = cb.CheckoutRequestID;
+      const items: StkItem[] = cb.CallbackMetadata?.Item ?? [];
+      receipt = items.find((i) => i.Name === "MpesaReceiptNumber")?.Value;
     }
-    
+
+    if (
+      typeof checkoutRequestId === "string" && CHECKOUT_RE.test(checkoutRequestId) &&
+      typeof receipt === "string" && RECEIPT_RE.test(receipt.toUpperCase())
+    ) {
+      const supabase = createSupabaseAdminClient();
+      const { error } = await supabase.from("mpato_payments_transactions").upsert({
+        checkout_request_id: checkoutRequestId,
+        receipt_number: receipt.toUpperCase(),
+      });
+      if (error) console.error("M-PESA callback upsert error:", error.message);
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("NovaPay callback error", err);
-    // Always return 200 to NovaPay otherwise they might retry unnecessarily
+    console.error("M-PESA callback error", err instanceof Error ? err.message : err);
+    // 200 so the gateway doesn't retry malformed payloads forever.
     return NextResponse.json({ success: false });
   }
 }

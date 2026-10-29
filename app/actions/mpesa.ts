@@ -1,6 +1,15 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guard";
+
 export async function initiateStkPush(amount: number, phone: string) {
+  // Triggers a real payment prompt on someone's phone: signed-in staff only.
+  const guard = await requireRole(["owner", "manager", "cashier"]);
+  if (!guard.ok) return { ok: false, error: guard.error };
+  if (!Number.isFinite(amount) || amount < 1 || amount > 250000) {
+    return { ok: false, error: "Invalid amount" };
+  }
+
   try {
     const appKey = process.env.NOVAPAY_APP_KEY?.trim();
     if (!appKey) throw new Error("Missing Novapay App Key");
@@ -20,12 +29,15 @@ export async function initiateStkPush(amount: number, phone: string) {
                     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 
                     "https://mpato.novaworks.pro");
 
+    const callbackSecret = process.env.MPESA_CALLBACK_SECRET;
+    if (!callbackSecret) throw new Error("Payment callback is not configured");
+
     const payload = {
       phone: formattedPhone,
       amount: Math.ceil(amount),
       accountReference: "Mpato POS",
       transactionDesc: "POS Payment",
-      callbackUrl: `${siteUrl}/api/mpesa/callback`,
+      callbackUrl: `${siteUrl}/api/mpesa/callback?token=${encodeURIComponent(callbackSecret)}`,
     };
 
     const response = await fetch("https://pay.novaworks.pro/api/mpesa/stkpush", {
@@ -42,7 +54,7 @@ export async function initiateStkPush(amount: number, phone: string) {
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      console.error("Non-JSON response from NovaPay:", response.status, responseText.slice(0, 500));
+      console.error("Non-JSON response from NovaPay:", response.status);
       return { ok: false, error: `NovaPay gateway returned an invalid response (Status ${response.status}). It might be blocking the server.` };
     }
 
@@ -54,7 +66,7 @@ export async function initiateStkPush(amount: number, phone: string) {
     }
   } catch (error: any) {
     console.error("STK Push error:", error);
-    return { ok: false, error: error.message || "An unexpected error occurred" };
+    return { ok: false, error: "Could not start the payment. Try again." };
   }
 }
 
@@ -62,6 +74,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export async function checkStkPushStatus(checkoutRequestId: string): Promise<{ status: "success", receipt: string } | { status: "pending" } | { status: "failed", error: string }> {
+  const guard = await requireRole(["owner", "manager", "cashier"]);
+  if (!guard.ok) return { status: "failed", error: guard.error };
   try {
     // 1. Check if the webhook already saved the receipt in Supabase
     const cookieStore = await cookies();
@@ -82,14 +96,13 @@ export async function checkStkPushStatus(checkoutRequestId: string): Promise<{ s
       },
     });
 
-    const { data: cbData } = await supabase
-      .from("mpato_payments_transactions")
-      .select("receipt_number")
-      .eq("checkout_request_id", checkoutRequestId)
-      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: receipt } = await (supabase as any).rpc("mpato_receipt_for_checkout", {
+      p_checkout: checkoutRequestId,
+    });
 
-    if (cbData?.receipt_number) {
-      return { status: "success", receipt: cbData.receipt_number };
+    if (typeof receipt === "string" && receipt) {
+      return { status: "success", receipt };
     }
 
     return { status: "pending" };

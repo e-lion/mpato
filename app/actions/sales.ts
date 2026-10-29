@@ -39,11 +39,11 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
 
   if (input.method === "mpesa" && ref) {
     // 1. Verify the receipt exists in our system (the webhook delivered it)
-    const { data: receiptRecord, error: receiptErr } = await supabase
-      .from("mpato_payments_transactions")
-      .select("receipt_number")
-      .eq("receipt_number", ref)
-      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: receiptRecord, error: receiptErr } = await (supabase as any).rpc(
+      "mpato_receipt_exists",
+      { p_receipt: ref },
+    );
 
     if (receiptErr) {
       console.error("recordSale receiptErr:", receiptErr);

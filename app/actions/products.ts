@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCurrentStoreId } from "@/lib/data/queries";
+import { requireRole, MANAGE } from "@/lib/auth/guard";
 
 export type ProductInput = {
   name: string;
@@ -32,8 +32,9 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   const err = validate(input);
   if (err) return { ok: false, error: err };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const row = {
@@ -57,8 +58,9 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
   const err = validate(input);
   if (err) return { ok: false, error: err };
 
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const patch = {
@@ -83,8 +85,9 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  const storeId = await getCurrentStoreId();
-  if (!storeId) return { ok: false, error: "No active store" };
+  const g = await requireRole(MANAGE);
+  if (!g.ok) return g;
+  const storeId = g.storeId;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase

@@ -1,6 +1,10 @@
 "use server";
 
+import { requireRole, MANAGE } from "@/lib/auth/guard";
+
 export async function sendWhatsAppMessage(sessionId: string, to: string, text: string) {
+  const guard = await requireRole(MANAGE, sessionId);
+  if (!guard.ok) return { success: false, error: guard.error };
   const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
   const apiKey = process.env.WHATSAPP_GATEWAY_API_KEY;
 
@@ -8,6 +12,12 @@ export async function sendWhatsAppMessage(sessionId: string, to: string, text: s
     console.error("Missing WHATSAPP_GATEWAY_API_KEY");
     return { success: false, error: "Missing API Key" };
   }
+
+  const digits = to.replace(/\D/g, "");
+  if (digits.length < 9 || digits.length > 15 || !text.trim() || text.length > 4000) {
+    return { success: false, error: "Invalid recipient or message" };
+  }
+  to = digits;
 
   try {
     const response = await fetch(`${workerUrl}/api/send`, {
@@ -36,11 +46,13 @@ export async function sendWhatsAppMessage(sessionId: string, to: string, text: s
     return { success: true, data };
   } catch (error: any) {
     console.error("Error sending WhatsApp message:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "Request failed" };
   }
 }
 
 export async function startWhatsAppSession(sessionId: string) {
+  const guard = await requireRole(MANAGE, sessionId);
+  if (!guard.ok) return { success: false, error: guard.error };
   const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
   const apiKey = process.env.WHATSAPP_GATEWAY_API_KEY;
 
@@ -50,7 +62,9 @@ export async function startWhatsAppSession(sessionId: string) {
 
   try {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://mpato.novaworks.pro";
-    const webhookUrl = `${siteUrl}/api/whatsapp/webhook`;
+    const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
+    if (!secret) return { success: false, error: "Missing webhook secret" };
+    const webhookUrl = `${siteUrl}/api/whatsapp/webhook?token=${encodeURIComponent(secret)}`;
 
     const response = await fetch(`${workerUrl}/api/session/start`, {
       method: "POST",
@@ -70,11 +84,13 @@ export async function startWhatsAppSession(sessionId: string) {
     return { success: true, data };
   } catch (error: any) {
     console.error("Error starting WhatsApp session:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "Request failed" };
   }
 }
 
 export async function logoutWhatsAppSession(sessionId: string) {
+  const guard = await requireRole(MANAGE, sessionId);
+  if (!guard.ok) return { success: false, error: guard.error };
   const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
   const apiKey = process.env.WHATSAPP_GATEWAY_API_KEY;
 
@@ -101,11 +117,13 @@ export async function logoutWhatsAppSession(sessionId: string) {
     return { success: true, data };
   } catch (error: any) {
     console.error("Error logging out WhatsApp session:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "Request failed" };
   }
 }
 
 export async function getWhatsAppStatus(sessionId: string) {
+  const guard = await requireRole(MANAGE, sessionId);
+  if (!guard.ok) return { success: false, error: guard.error };
   const workerUrl = process.env.NEXT_PUBLIC_WHATSAPP_WORKER_URL || "https://wa.novaworks.pro";
   const apiKey = process.env.WHATSAPP_GATEWAY_API_KEY;
 
@@ -127,7 +145,7 @@ export async function getWhatsAppStatus(sessionId: string) {
 
     return { success: true, data };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: "Request failed" };
   }
 }
 
