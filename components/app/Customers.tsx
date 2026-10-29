@@ -67,11 +67,11 @@ export function Customers({ customers }: { customers: Customer[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <div
-          className="section-h"
+          className="section-h toolbar"
           style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", marginBottom: 0 }}
         >
           <h2>Customers</h2>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="toolbar-actions" style={{ display: "flex", gap: 10 }}>
             <Btn variant="secondary" icon="download">Export</Btn>
             <Btn variant="primary" icon="user-plus" onClick={() => setForm({ kind: "create" })}>
               Add customer
@@ -83,7 +83,7 @@ export function Customers({ customers }: { customers: Customer[] }) {
             No customers yet — click &quot;Add customer&quot; to build your book.
           </div>
         ) : (
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Customer</th>
@@ -92,6 +92,7 @@ export function Customers({ customers }: { customers: Customer[] }) {
                 <th className="num" style={{ textAlign: "right" }}>Visits</th>
                 <th>Last seen</th>
                 <th>Status</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -107,25 +108,25 @@ export function Customers({ customers }: { customers: Customer[] }) {
                       <span style={{ fontWeight: 600 }}>{c.name}</span>
                     </div>
                   </td>
-                  <td className="mono" style={{ color: "var(--fg2)" }}>{c.phone ?? "—"}</td>
-                  <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{KES(c.spent)}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{c.visits}</td>
-                  <td style={{ color: "var(--fg3)" }}>{c.last}</td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <Badge kind={tagKind(c.tag)} dot>{c.tag}</Badge>
-                      <button
-                        className="iconbtn"
-                        style={{ width: 28, height: 28, border: "none", background: "none" }}
-                        aria-label={`Edit ${c.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setForm({ kind: "edit", customer: c });
-                        }}
-                      >
-                        <Icon name="pencil" size={14} />
-                      </button>
-                    </div>
+                  <td className="mono" data-label="Phone" style={{ color: "var(--fg2)" }}>{c.phone ?? "—"}</td>
+                  <td className="num" data-label="Total spent" style={{ textAlign: "right", fontWeight: 700 }}>{KES(c.spent)}</td>
+                  <td className="num" data-label="Visits" style={{ textAlign: "right" }}>{c.visits}</td>
+                  <td data-label="Last seen" style={{ color: "var(--fg3)" }}>{c.last}</td>
+                  <td data-label="Status">
+                    <Badge kind={tagKind(c.tag)} dot>{c.tag}</Badge>
+                  </td>
+                  <td className="td-action" style={{ textAlign: "right" }}>
+                    <button
+                      className="iconbtn"
+                      style={{ width: 32, height: 32, border: "none", background: "none" }}
+                      aria-label={`Edit ${c.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setForm({ kind: "edit", customer: c });
+                      }}
+                    >
+                      <Icon name="pencil" size={14} />
+                    </button>
                   </td>
                 </tr>
               ))}
