@@ -3,7 +3,7 @@ import {
   Boxes, Candy, Check, ChevronDown, ChevronsUpDown, Cookie, CupSoda, Download, Droplet, Ellipsis,
   Filter, Flame, LayoutDashboard, Leaf, LocateFixed, LogOut, Map, Milk, Minus, Package, Pencil, PlayCircle, Plus,
   Printer, Receipt, Sandwich, Search, Send, Settings, ShoppingCart, Smartphone,
-  Sparkles, Store, Trash2, TrendingUp, Truck, UserPlus, UserRound, Users, Wheat, X, Zap,
+  Sparkles, Store, Trash2, TrendingUp, Truck, UserPlus, UserRound, Users, Wallet, Wheat, X, Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +32,7 @@ const MAP: Record<string, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
   leaf: Leaf,
   "locate-fixed": LocateFixed,
+  wallet: Wallet,
   "log-out": LogOut,
   map: Map,
   milk: Milk,

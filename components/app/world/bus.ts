@@ -11,3 +11,9 @@ export type SaleSceneEvent =
   | { type: "paid"; method: "cash" | "mpesa"; total: number }
   | { type: "next" }
   | { type: "leave" };
+
+/** Events the in-world receive-stock drawer sends to the engine. */
+export type DeliverySceneEvent =
+  | { type: "supplier"; name: string | null } // a supplier was chosen → their truck pulls up (null: truck leaves)
+  | { type: "received"; lines: number; paid: number } // receipt saved → unload, pay, truck leaves
+  | { type: "leave" };

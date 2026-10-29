@@ -713,3 +713,21 @@ export async function getWorldStores(): Promise<WorldStore[]> {
     })
     .sort((x, y) => y.salesToday - x.salesToday);
 }
+
+/** Shop wallet in whole shillings: all sales in minus supplier payments out.
+ *  Uses the mpato_wallet_balance() SQL function; if it isn't deployed yet, falls
+ *  back to summing rows so the world still shows a number. */
+export async function getWalletBalance(storeId: string): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc("mpato_wallet_balance", { p_store_id: storeId });
+  if (!error && data !== null && data !== undefined) return Math.round(Number(data) / 100);
+
+  const [{ data: sales }, { data: pays }] = await Promise.all([
+    supabase.from("mpato_sales").select("total_cents").eq("store_id", storeId).limit(50000),
+    supabase.from("mpato_supplier_payments").select("amount_cents").eq("store_id", storeId).limit(50000),
+  ]);
+  const inC = ((sales ?? []) as Row[]).reduce((s, r) => s + (Number(r.total_cents) || 0), 0);
+  const outC = ((pays ?? []) as Row[]).reduce((s, r) => s + (Number(r.amount_cents) || 0), 0);
+  return Math.round((inC - outC) / 100);
+}

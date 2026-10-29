@@ -341,3 +341,12 @@
   15% { opacity: 1; transform: translateY(0) scale(1.1); }
   to { opacity: 0; transform: translateY(-42px) scale(1); }
 }
+
+.world-drawer-end { display: flex; align-items: center; gap: 10px; }
+.world-wallet {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  background: var(--stone-100, #f1efea); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700;
+}
+.world3d-pop.out { color: var(--ember, #ff3522); }

@@ -4,6 +4,7 @@ import {
   getRecentSales,
   getStockReceipts,
   getCurrentStoreId,
+  getWalletBalance,
 } from "@/lib/data/queries";
 import { getSessionContext } from "@/lib/data/session";
 import type { WorldEvent } from "@/components/app/world/types";
@@ -47,5 +48,15 @@ export default async function WorldPage() {
     );
   }
 
-  return <World stores={stores} activeStoreId={ctx?.store?.id ?? null} seedEvents={seedEvents} />;
+  const balances = await Promise.all(stores.map((s) => getWalletBalance(s.storeId).catch(() => 0)));
+  const wallets = Object.fromEntries(stores.map((s, i) => [s.storeId, balances[i]]));
+
+  return (
+    <World
+      stores={stores}
+      activeStoreId={ctx?.store?.id ?? null}
+      seedEvents={seedEvents}
+      wallets={wallets}
+    />
+  );
 }

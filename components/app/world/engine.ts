@@ -7,7 +7,8 @@ import { PAL } from "./palette";
 import { KES } from "@/lib/format";
 import type { WorldStore } from "@/lib/data/queries";
 import type { WorldEvent } from "./types";
-import type { SaleSceneEvent } from "./bus";
+import type { SaleSceneEvent, DeliverySceneEvent } from "./bus";
+import { DeliveryScene } from "./deliveryScene";
 import { Tweens, easeInOut as ease } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { SaleScene } from "./saleScene";
@@ -69,6 +70,7 @@ export class WorldEngine {
   private focusReturnId: string | null = null;
   private interior: Interior | null = null;
   private saleScene: SaleScene | null = null;
+  private deliveryScene: DeliveryScene | null = null;
   private mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private inset = { right: 0, bottom: 0 };
   private resizeObs: ResizeObserver;
@@ -235,6 +237,12 @@ export class WorldEngine {
     this.markDirty();
   }
 
+  /** Forward receive-drawer events to the delivery choreography. */
+  delivery(e: DeliverySceneEvent) {
+    this.deliveryScene?.handle(e);
+    this.markDirty();
+  }
+
   private setShopsHidden(hidden: boolean, only?: string) {
     for (const [sid, node] of this.shops) {
       if (only && sid !== only) continue;
@@ -264,6 +272,7 @@ export class WorldEngine {
     const pos = this.posByStore.get(id);
     if (!pos) return;
     this.saleScene?.dispose();
+    this.deliveryScene?.dispose();
     this.mapPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     this.focusId = id;
     this.setShopsHidden(true);
@@ -274,6 +283,7 @@ export class WorldEngine {
     this.interior.group.position.copy(pos);
     this.scene.add(this.interior.group);
     this.saleScene = new SaleScene(this.interior, this.tweens, () => this.markDirty());
+    this.deliveryScene = new DeliveryScene(this.interior, this.tweens, () => this.markDirty());
 
     const target = pos.clone().add(new THREE.Vector3(0, 0.7, 0.9));
     const camPos = pos.clone().add(new THREE.Vector3(0, 5.6, 9.2));
@@ -291,6 +301,8 @@ export class WorldEngine {
   private exitShop() {
     this.saleScene?.dispose();
     this.saleScene = null;
+    this.deliveryScene?.dispose();
+    this.deliveryScene = null;
     this.tweens.clear();
     const room = this.interior;
     this.interior = null;
@@ -322,6 +334,7 @@ export class WorldEngine {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.saleScene?.dispose();
+    this.deliveryScene?.dispose();
     this.tweens.clear();
     this.resizeObs.disconnect();
     const dom = this.renderer.domElement;
