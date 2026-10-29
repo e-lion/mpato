@@ -1,4 +1,5 @@
 @import "../styles/tokens.css";
+@import "../styles/world.css";
 
 /* Minimal root resets shared by every route group. */
 *, *::before, *::after { box-sizing: border-box; }

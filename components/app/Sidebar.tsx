@@ -11,6 +11,7 @@ type NavItem = { href: string; label: string; icon: string; badge?: string };
 
 const PRIMARY: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+  { href: "/world", label: "World", icon: "map" },
   { href: "/pos", label: "Point of sale", icon: "shopping-cart" },
   { href: "/inventory", label: "Inventory", icon: "package" },
   { href: "/customers", label: "Customers", icon: "users" },

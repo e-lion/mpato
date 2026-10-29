@@ -1,0 +1,304 @@
+/* ============================================================
+   Mpato World — isometric 2.5D "city of shops".
+   SVG + CSS only; all colour from design tokens (tokens.css).
+   Light-theme app, so no dark-mode block needed.
+   ============================================================ */
+
+/* Stage fills the content area, edge-to-edge under the sticky topbar
+   (cancels .content's 24/28/40 padding). */
+.world-wrap {
+  position: relative;
+  margin: -24px -28px -40px;
+  height: calc(100dvh - 64px);
+  min-height: 460px;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 8%,
+    var(--stone-50) 0%, var(--stone-100) 62%, var(--stone-200) 100%);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.world-wrap.panning { cursor: grabbing; }
+
+.world-stage {
+  position: absolute;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ---------- Building ---------- */
+.world-bldg {
+  position: absolute;
+  width: 160px;
+  height: 248px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+.world-bldg svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 10px 14px rgba(33, 30, 24, .14));
+  transition: filter var(--transition);
+}
+.world-bldg .face {
+  stroke: var(--stone-300);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.world-bldg:hover { transform: translateY(-6px); }
+.world-bldg:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: var(--r-lg);
+}
+.world-bldg.active .face { stroke: var(--brand); stroke-width: 2; }
+.world-bldg.selected { transform: translateY(-10px); }
+.world-bldg.selected svg { filter: drop-shadow(0 18px 24px rgba(255, 53, 34, .30)); }
+
+/* Name tags live in one overlay layer above all buildings. */
+.world-labels { position: absolute; inset: 0; z-index: 500; pointer-events: none; }
+.world-label {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+.world-label.active { border-color: var(--rose-300); box-shadow: 0 0 0 2px var(--rose-100), var(--shadow-sm); }
+.world-label .nm {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: -.2px;
+  color: var(--fg1);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.world-label .kv {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg3);
+}
+.world-label.active .kv { color: var(--brand-text); }
+
+.world-bldg-low {
+  position: absolute;
+  top: 6px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-pill);
+  padding: 1px 7px 1px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* ---------- HUD (top-left) ---------- */
+.world-hud {
+  position: absolute;
+  top: 16px; left: 16px;
+  z-index: 50;
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  padding: 12px 16px;
+  max-width: 60%;
+}
+.world-hud .lbl {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--fg3);
+}
+.world-hud .big {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 22px; letter-spacing: -.5px;
+  color: var(--fg1); font-variant-numeric: tabular-nums;
+}
+.world-hud .meta { font-size: 12px; color: var(--fg3); margin-top: 2px; }
+
+/* ---------- Controls (bottom-right) ---------- */
+.world-ctrl {
+  position: absolute;
+  right: 16px; bottom: 16px;
+  z-index: 50;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.world-ctrl button {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg1);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.world-ctrl button:hover { background: var(--stone-50); }
+
+.world-hint {
+  position: absolute;
+  bottom: 16px; left: 16px;
+  z-index: 40;
+  font-size: 12px;
+  color: var(--fg3);
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+}
+
+/* ---------- Selected-shop panel ---------- */
+.world-panel {
+  position: absolute;
+  z-index: 60;
+  top: 16px; right: 16px;
+  width: 320px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 18px;
+}
+.world-panel-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.world-panel-h h3 {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 18px; letter-spacing: -.3px;
+  margin: 0; color: var(--fg1);
+}
+.world-panel .area { font-size: 13px; color: var(--fg3); margin-top: 2px; }
+.world-panel-close {
+  flex-shrink: 0;
+  border: 0; background: var(--stone-100);
+  border-radius: var(--r-pill);
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  color: var(--fg2); cursor: pointer;
+}
+.world-panel-close:hover { background: var(--stone-200); }
+
+.world-stats { display: flex; gap: 18px; margin: 16px 0; }
+.world-stat .v {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 18px;
+  font-variant-numeric: tabular-nums; color: var(--fg1);
+}
+.world-stat.low .v { color: var(--warning-fg); }
+.world-stat .k {
+  font-size: 11px; color: var(--fg3);
+  text-transform: uppercase; letter-spacing: .5px; font-weight: 700;
+  margin-top: 1px;
+}
+
+.world-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.world-actions button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--white);
+  color: var(--fg1);
+  font-weight: 600; font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.world-actions button:hover {
+  background: var(--rose-50);
+  border-color: var(--rose-200);
+  color: var(--rose-700);
+}
+.world-actions button:disabled { opacity: .55; cursor: default; }
+
+.world-empty {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  text-align: center; padding: 24px;
+}
+.world-empty .inner { max-width: 340px; }
+.world-empty h2 {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 22px; letter-spacing: -.4px;
+  margin: 14px 0 8px; color: var(--fg1);
+}
+.world-empty p { color: var(--fg2); font-size: 15px; line-height: 1.5; margin: 0; }
+.world-empty .ico {
+  width: 64px; height: 64px; margin: 0 auto;
+  border-radius: var(--r-xl);
+  background: var(--rose-50); color: var(--rose-600);
+  display: grid; place-items: center;
+}
+
+/* Phone: panel becomes a bottom sheet, HUD shrinks. */
+@media (max-width: 640px) {
+  .world-panel {
+    top: auto; right: 0; left: 0; bottom: 0;
+    width: auto;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+  }
+  .world-hud { max-width: calc(100% - 32px); }
+}
+
+/* ---------- 3D layer (Phase 2) ---------- */
+.world-canvas { position: absolute; inset: 0; }
+.world-wrap canvas { display: block; touch-action: none; }
+
+.world-loading {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: var(--fg3); font-size: 14px; font-weight: 500;
+}
+
+/* Billboard labels rendered by drei <Html> above each shop. */
+.world3d-label {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 3px 9px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-6px);
+}
+.world3d-label.active { border-color: var(--rose-300); box-shadow: 0 0 0 2px var(--rose-100), var(--shadow-sm); }
+.world3d-label .nm {
+  font-family: var(--font-display); font-weight: 700; font-size: 12px;
+  letter-spacing: -.2px; color: var(--fg1);
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+}
+.world3d-label .kv {
+  font-family: var(--font-sans); font-variant-numeric: tabular-nums;
+  font-size: 10.5px; font-weight: 600; color: var(--fg3);
+}
+.world3d-label.active .kv { color: var(--brand-text); }
+
+.world-toast {
+  position: absolute; left: 50%; bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 55;
+  background: var(--stone-900); color: var(--white);
+  font-size: 13px; font-weight: 600;
+  padding: 8px 14px; border-radius: var(--r-pill);
+  box-shadow: var(--shadow-lg);
+}
