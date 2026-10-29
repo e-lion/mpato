@@ -41,6 +41,23 @@ type AgentNode = {
   update: (dt: number) => boolean; // returns false when finished
 };
 
+let contactTex: THREE.CanvasTexture | null = null;
+/** A soft radial blob, used as a cheap ambient-occlusion stand-in under buildings. */
+function contactTexture() {
+  if (contactTex) return contactTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const x = c.getContext("2d")!;
+  const g = x.createRadialGradient(64, 64, 18, 64, 64, 62);
+  g.addColorStop(0, "rgba(60,48,32,0.9)");
+  g.addColorStop(0.55, "rgba(60,48,32,0.35)");
+  g.addColorStop(1, "rgba(60,48,32,0)");
+  x.fillStyle = g;
+  x.fillRect(0, 0, 128, 128);
+  contactTex = new THREE.CanvasTexture(c);
+  return contactTex;
+}
+
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 /**
@@ -111,7 +128,8 @@ export class WorldEngine {
     this.camera.position.copy(this.home);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    // sharper on desktop, capped on phones where fill rate is the bottleneck
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth >= 900 ? 2 : 1.5));
     this.renderer.setSize(w, h);
     this.renderer.toneMapping = THREE.NeutralToneMapping; // keeps the brand palette, softens highlights
     this.renderer.toneMappingExposure = 0.9;
@@ -140,8 +158,8 @@ export class WorldEngine {
     this.controls.addEventListener("change", () => (this.dirtyUntil = performance.now() + 150));
 
     // lights
-    this.scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(PAL.stone200).getHex(), 0.9));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    this.scene.add(new THREE.HemisphereLight(0xfff8ee, new THREE.Color(PAL.stone300).getHex(), 0.95));
+    const dir = new THREE.DirectionalLight(0xfff1dc, 1.05); // warm sun
     dir.position.set(8, 16, 6);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
@@ -478,6 +496,13 @@ export class WorldEngine {
     }
     const maxDim = Math.max(cols, rows);
     this.baseR = Math.max(10, maxDim * SP * 1.15);
+    // keep shadows covering the whole lattice as it grows (the town is only shadowed inside this box)
+    const ext = Math.max(14, maxDim * SP * 0.8);
+    const sc = this.sun.shadow.camera;
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
+    sc.far = Math.max(60, ext * 4);
+    this.sun.position.set(ext * 0.6, ext * 1.2, ext * 0.45);
+    sc.updateProjectionMatrix();
     this.controls.maxDistance = this.baseR * 2.6;
   }
 
@@ -529,6 +554,12 @@ export class WorldEngine {
     const brand = active ? PAL.ember : PAL.rose400;
     let seed = 0;
     for (const c of store.storeId) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+
+    // soft contact shadow so the building sits on the pavement instead of floating on it
+    const cs = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 4.0), new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: 0.55 }));
+    cs.rotation.x = -Math.PI / 2;
+    cs.position.y = 0.045;
+    group.add(cs);
 
     // body on a plinth
     add(2.5, 0.12, 2.5, std(PAL.stone400, 0.9), 0, 0.06, 0);
