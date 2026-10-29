@@ -20,6 +20,9 @@ export type Interior = {
     counterSlots: THREE.Vector3[]; // where bought goods rest on the counter
     shelfSpots: THREE.Vector3[]; // where goods are picked from
     bay: THREE.Vector3; // loading-bay door (right wall) for deliveries
+    // pavement waypoints that run round the rear of a parked delivery truck, so nobody walks through it
+    curbFar: THREE.Vector3;
+    curbNear: THREE.Vector3;
   };
 };
 
@@ -192,6 +195,8 @@ export function buildInterior(accent: string = PAL.ember): Interior {
       counterSlots,
       shelfSpots,
       bay: new THREE.Vector3(2.6, 0, 0.2),
+      curbFar: new THREE.Vector3(-1.3, 0, 5.3),
+      curbNear: new THREE.Vector3(-1.3, 0, 2.7),
     },
   };
 }

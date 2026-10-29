@@ -14,7 +14,7 @@ import { RoomScene } from "./roomScene";
 import { Tweens, easeSmooth } from "./tween";
 import { buildInterior, type Interior } from "./interior";
 import { preloadCharacter } from "./assets";
-import { updatePeople } from "./people";
+import { makePerson, updatePeople } from "./people";
 import { SaleScene } from "./saleScene";
 
 const SP = 6; // lattice spacing between shops
@@ -59,6 +59,9 @@ export class WorldEngine {
   private clock = new THREE.Clock();
   private shops = new Map<string, ShopNode>();
   private agents: AgentNode[] = [];
+  /** People are only spawned once the character models are in, so nobody pops from a placeholder to a real body. */
+  private charsLoaded = false;
+  private charsReady: Promise<void> = Promise.resolve();
   private posByStore = new Map<string, THREE.Vector3>();
   private stores: WorldStore[] = [];
   private activeStoreId: string | null = null;
@@ -175,7 +178,7 @@ export class WorldEngine {
     this.resizeObs = new ResizeObserver(() => this.onResize());
     this.resizeObs.observe(container);
 
-    void preloadCharacter(); // ready by the time the user steps into a shop
+    this.charsReady = preloadCharacter().then(() => { this.charsLoaded = true; }); // ready by the time the user steps into a shop
     this.clock.start();
     this.markDirty();
     this.raf = requestAnimationFrame(this.tick);
@@ -578,20 +581,53 @@ export class WorldEngine {
     amountKES = 0,
     method?: "mpesa" | "cash",
   ) {
-    const APPROACH = 1.8, DWELL = 1.0, DEPART = 1.8, TOTAL = APPROACH + DWELL + DEPART;
+    if (!this.charsLoaded) {
+      void this.charsReady.then(() => {
+        if (!this.disposed) this.spawnCustomer(target, ambient, amountKES, method);
+      });
+      return;
+    }
+    const SPEED = 2.3, DWELL = 1.0;
+    const V = (x: number, z: number) => new THREE.Vector3(x, 0, z);
     const doorX = target.x, doorZ = target.z + 1.5;
-    const ox = (Math.random() - 0.5) * 3, ox2 = (Math.random() - 0.5) * 3;
-    const entryX = target.x + ox, exitX = target.x + ox2, laneZ = target.z + 9;
+    const laneZ = target.z + 9;
+    // Cross the street beside the parked delivery truck, then walk the pavement to the door.
+    const inSide = Math.random() < 0.5 ? -2.5 : 2.7;
+    const outSide = Math.random() < 0.5 ? -2.5 : 2.7;
+    const entryX = target.x + (Math.random() - 0.5) * 3;
+    const exitX = target.x + (Math.random() - 0.5) * 3;
+    const inPts = [V(entryX, laneZ), V(doorX + inSide, target.z + 5), V(doorX + inSide, target.z + 1.9), V(doorX, doorZ)];
+    const outPts = [V(doorX, doorZ), V(doorX + outSide, target.z + 1.9), V(doorX + outSide, target.z + 5), V(exitX, laneZ)];
+    const lenOf = (pts: THREE.Vector3[]) => pts.slice(1).reduce((n, p, i) => n + p.distanceTo(pts[i]), 0);
+    const inLen = lenOf(inPts), outLen = lenOf(outPts);
+    const pointAt = (pts: THREE.Vector3[], d: number, out: THREE.Vector3, dir: THREE.Vector3) => {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const seg = pts[i].distanceTo(pts[i + 1]);
+        if (d <= seg || i === pts.length - 2) {
+          const k = seg > 0 ? Math.min(1, d / seg) : 1;
+          out.lerpVectors(pts[i], pts[i + 1], k);
+          dir.subVectors(pts[i + 1], pts[i]);
+          return;
+        }
+        d -= seg;
+      }
+    };
     const color = ambient ? PAL.stone400 : method === "cash" ? PAL.stone600 : PAL.mpesa;
     const showCoin = !ambient && amountKES > 0;
 
     const g = new THREE.Group();
-    g.position.set(entryX, 0, laneZ);
+    g.position.copy(inPts[0]);
     g.userData = showCoin
       ? { kind: "customer", pickable: true, amountKES, method }
       : { kind: "customer", pickable: false };
-    g.add(mesh(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), color, [0, 0.42, 0]));
-    g.add(mesh(new THREE.SphereGeometry(0.15, 14, 12), PAL.stone300, [0, 0.84, 0]));
+    // a real person (rigged body), scaled to sit right beside the toy-scale shops
+    const person = makePerson({ skin: "#d9a47c", shirt: color });
+    person.group.scale.setScalar(0.9);
+    g.add(person.group);
+    // generous invisible hit area so tapping a person is easy
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.3, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    hit.position.y = 0.65;
+    g.add(hit);
 
     let coin: THREE.Mesh | null = null;
     let coinMat: THREE.MeshStandardMaterial | null = null;
@@ -605,36 +641,63 @@ export class WorldEngine {
       });
       coin = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.04, 16), coinMat);
       coin.rotation.x = Math.PI / 2;
-      coin.position.set(0, 1.1, 0);
+      coin.position.set(0, 1.4, 0);
       coin.visible = false;
       g.add(coin);
     }
     this.scene.add(g);
 
-    let t = 0;
+    let phase = 0; // 0 in, 1 at the door, 2 out
+    let s = 0, dwellT = 0;
+    const pos = new THREE.Vector3(), dir = new THREE.Vector3();
     this.agents.push({
       group: g,
       update: (dt) => {
-        t += dt;
-        let x: number, z: number, coinP = -1;
-        if (t < APPROACH) {
-          const p = easeInOut(t / APPROACH);
-          x = entryX + (doorX - entryX) * p;
-          z = laneZ + (doorZ - laneZ) * p;
-          g.rotation.y = Math.atan2(doorX - entryX, doorZ - laneZ);
-        } else if (t < APPROACH + DWELL) {
-          x = doorX; z = doorZ; coinP = (t - APPROACH) / DWELL;
-        } else if (t < TOTAL) {
-          const p = easeInOut((t - APPROACH - DWELL) / DEPART);
-          x = doorX + (exitX - doorX) * p;
-          z = doorZ + (laneZ - doorZ) * p;
-          g.rotation.y = Math.atan2(exitX - doorX, laneZ - doorZ);
-        } else return false;
-        g.position.set(x, Math.abs(Math.sin(t * 8)) * 0.04, z);
-        if (coin && coinMat) {
-          if (coinP >= 0) { coin.visible = true; coin.position.y = 1.1 + coinP * 0.7; coinMat.opacity = 1 - coinP; }
-          else coin.visible = false;
+        if (phase === 1) {
+          dwellT += dt;
+          const cp = Math.min(1, dwellT / DWELL);
+          person.walk(0, 0);
+          if (coin && coinMat) {
+            coin.visible = true;
+            coin.position.y = 1.4 + cp * 0.7;
+            coinMat.opacity = 1 - cp;
+          }
+          if (dwellT >= DWELL) {
+            phase = 2;
+            s = 0;
+            if (coin) coin.visible = false;
+          }
+          return true;
         }
+        const pts = phase === 0 ? inPts : outPts;
+        const total = phase === 0 ? inLen : outLen;
+        // never walk through a delivery truck: hold position until it has passed
+        pointAt(pts, Math.min(total, s + 0.9), pos, dir);
+        const blocked = this.agents.some((a) => {
+          if (a.group.userData.kind !== "truck") return false;
+          return Math.abs(pos.x - a.group.position.x) < 2.1 && Math.abs(pos.z - a.group.position.z) < 1.2;
+        });
+        if (blocked) {
+          person.walk(0, 0);
+          return true;
+        }
+        s += SPEED * dt;
+        if (s >= total) {
+          if (phase === 0) {
+            phase = 1;
+            g.position.copy(pts[pts.length - 1]);
+            g.rotation.y = Math.PI; // face the shop
+            return true;
+          }
+          return false;
+        }
+        pointAt(pts, s, pos, dir);
+        g.position.copy(pos);
+        const yaw = Math.atan2(dir.x, dir.z);
+        let dy = yaw - g.rotation.y;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        g.rotation.y += dy * Math.min(1, dt * 10);
+        person.walk(s / 0.38, 1);
         return true;
       },
     });

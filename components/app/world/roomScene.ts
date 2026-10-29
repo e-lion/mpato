@@ -339,7 +339,7 @@ export class RoomScene {
     const g = { person, tag: label, stop: () => {} };
     this.guest = g;
     const keeper = this.room.shopkeeper;
-    g.stop = walkPath(this.tweens, person, [a.street, a.door, a.customer], 2.6, () => {
+    g.stop = walkPath(this.tweens, person, [a.street, a.curbFar, a.curbNear, a.door, a.customer], 2.6, () => {
       this.face(person, Math.PI);
       this.face(keeper, 0);
       this.tweens.add(0.9, (p) => {
@@ -359,7 +359,7 @@ export class RoomScene {
     g.tag.element.remove();
     const a = this.room.anchors;
     const p = g.person;
-    walkPath(this.tweens, p, [p.group.position.clone(), a.door, a.street.clone().setX(-1.6)], quick ? 4 : 2.6, () =>
+    walkPath(this.tweens, p, [p.group.position.clone(), a.door, a.curbNear, a.curbFar, a.street.clone().setX(-1.6)], quick ? 4 : 2.6, () =>
       this.room.group.remove(p.group),
     );
     this.dirty();
