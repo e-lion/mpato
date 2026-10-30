@@ -8,3 +8,18 @@
 
 Replace either with a CC0 model of your own (e.g. from Kenney or Quaternius) at any time:
 the code only expects a rigged `character.glb` with `idle` and `walk` clips and a `truck.glb`.
+
+
+## Kenney (https://kenney.nl), CC0 1.0 (public domain, credit optional)
+
+Downloaded Oct 2026 and copied selectively into `kenney/` (each folder keeps the pack's `Textures/colormap.png`).
+
+| Folder | Pack | Version |
+|---|---|---|
+| `kenney/characters/` | Mini Characters | 1.0 |
+| `kenney/commercial/` | City Kit (Commercial) | 2.1 |
+| `kenney/suburban/` | City Kit (Suburban) | 2.0 |
+| `kenney/roads/` | City Kit (Roads) | 2.2 |
+| `kenney/cars/` | Car Kit | 3.1 |
+
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/

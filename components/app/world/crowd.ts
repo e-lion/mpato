@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import type { Person } from "./people";
+import { makeKenneyPerson, type Person } from "./people";
+import { KENNEY, available, kenneyModel } from "./kenney";
 
 /**
  * Street life for the map view: a small, varied crowd (men, women, children, elders) that strolls
@@ -52,10 +53,44 @@ function part(g: THREE.BufferGeometry, m: THREE.Material) {
   return mesh;
 }
 
-type Figure = Person & { speed: number; stepLen: number };
+type Figure = Person & { speed: number; stepLen: number; update?: (dt: number) => void };
+
+/** A Kenney mini character for this kind of person, or null if the models aren't loaded. */
+function makeKenneyFigure(kind: Kind, R: () => number): Figure | null {
+  const child = kind === "boy" || kind === "girl";
+  const elder = kind === "elderMan" || kind === "elderWoman";
+  const female = kind === "woman" || kind === "girl" || kind === "elderWoman";
+  const pool = available(KENNEY.characters).filter((n) => n.includes(female ? "character-female-" : "character-male-"));
+  if (!pool.length) return null;
+  // children are small, elders slightly smaller and slower; everyone else varies a little
+  // the Kenney city kit is toy scale: a person is about as tall as a shop door
+  const height = child ? 0.33 + R() * 0.03 : elder ? 0.46 + R() * 0.02 : 0.5 + R() * 0.05;
+  const p = makeKenneyPerson(pick(R, pool), { height, walkRate: child ? 1.5 : elder ? 0.8 : 1.1, register: false });
+  if (!p) return null;
+  if (elder) {
+    // a walking stick carried at the side
+    const cane = kenneyModel("characters/aid-cane");
+    if (cane) {
+      cane.object.scale.setScalar(0.3 / cane.size.y);
+      cane.object.position.set(0.17, 0, 0.07);
+      p.group.add(cane.object);
+    }
+  }
+  return {
+    group: p.group,
+    handLocal: p.handLocal,
+    walk: p.walk,
+    reach: p.reach,
+    update: p.update,
+    speed: child ? 0.85 + R() * 0.25 : elder ? 0.42 + R() * 0.1 : 0.7 + R() * 0.3,
+    stepLen: 0.3,
+  };
+}
 
 /** One articulated person, shaped and dressed by `kind`. Shapes and materials are shared across the crowd. */
 export function makeFigure(kind: Kind, R: () => number): Figure {
+  const kenney = makeKenneyFigure(kind, R);
+  if (kenney) return kenney;
   const child = kind === "boy" || kind === "girl";
   const elder = kind === "elderMan" || kind === "elderWoman";
   const female = kind === "woman" || kind === "girl" || kind === "elderWoman";
@@ -357,6 +392,7 @@ export class Crowd {
     // leaders first so followers read this frame's positions
     for (const w of this.walkers) if (!w.leader) this.stepLeader(w, dt, R);
     for (const w of this.walkers) if (w.leader) this.stepFollower(w, dt);
+    for (const w of this.walkers) w.fig.update?.(dt);
   }
 
   private face(w: Walker, tx: number, tz: number, dt: number) {

@@ -11,6 +11,7 @@ import type { WorldEvent } from "./types";
 import type { SaleSceneEvent, DeliverySceneEvent, RoomSceneEvent } from "./bus";
 import { DeliveryScene } from "./deliveryScene";
 import { RoomScene } from "./roomScene";
+import { KENNEY, available, kenneyModel, preloadKenney } from "./kenney";
 import { Town } from "./town";
 import { Crowd } from "./crowd";
 import { Tweens, easeSmooth } from "./tween";
@@ -29,7 +30,8 @@ export type EngineCallbacks = {
 
 type ShopNode = {
   group: THREE.Group;
-  wallMat: THREE.MeshStandardMaterial;
+  /** Materials that glow when the shop is selected or just made a sale. */
+  wallMats: THREE.MeshStandardMaterial[];
   store: WorldStore;
   pos: THREE.Vector3;
   pulse: number;
@@ -40,6 +42,23 @@ type AgentNode = {
   group: THREE.Group;
   update: (dt: number) => boolean; // returns false when finished
 };
+
+let contactTex: THREE.CanvasTexture | null = null;
+/** A soft radial blob, used as a cheap ambient-occlusion stand-in under buildings. */
+function contactTexture() {
+  if (contactTex) return contactTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const x = c.getContext("2d")!;
+  const g = x.createRadialGradient(64, 64, 18, 64, 64, 62);
+  g.addColorStop(0, "rgba(60,48,32,0.9)");
+  g.addColorStop(0.55, "rgba(60,48,32,0.35)");
+  g.addColorStop(1, "rgba(60,48,32,0)");
+  x.fillStyle = g;
+  x.fillRect(0, 0, 128, 128);
+  contactTex = new THREE.CanvasTexture(c);
+  return contactTex;
+}
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
@@ -63,6 +82,7 @@ export class WorldEngine {
   private agents: AgentNode[] = [];
   /** People are only spawned once the character models are in, so nobody pops from a placeholder to a real body. */
   private charsLoaded = false;
+  private pendingStores = false;
   private charsReady: Promise<void> = Promise.resolve();
   private posByStore = new Map<string, THREE.Vector3>();
   private stores: WorldStore[] = [];
@@ -111,7 +131,8 @@ export class WorldEngine {
     this.camera.position.copy(this.home);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    // sharper on desktop, capped on phones where fill rate is the bottleneck
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth >= 900 ? 2 : 1.5));
     this.renderer.setSize(w, h);
     this.renderer.toneMapping = THREE.NeutralToneMapping; // keeps the brand palette, softens highlights
     this.renderer.toneMappingExposure = 0.9;
@@ -140,8 +161,8 @@ export class WorldEngine {
     this.controls.addEventListener("change", () => (this.dirtyUntil = performance.now() + 150));
 
     // lights
-    this.scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(PAL.stone200).getHex(), 0.9));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    this.scene.add(new THREE.HemisphereLight(0xfff8ee, new THREE.Color(PAL.stone300).getHex(), 0.95));
+    const dir = new THREE.DirectionalLight(0xfff1dc, 1.05); // warm sun
     dir.position.set(8, 16, 6);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
@@ -192,7 +213,14 @@ export class WorldEngine {
     this.resizeObs = new ResizeObserver(() => this.onResize());
     this.resizeObs.observe(container);
 
-    this.charsReady = preloadCharacter().then(() => { this.charsLoaded = true; }); // ready by the time the user steps into a shop
+    // models load once; the shops wait for them so nothing is built as a placeholder and swapped later
+    this.charsReady = Promise.all([preloadCharacter(), preloadKenney()]).then(() => {
+      this.charsLoaded = true;
+      if (this.pendingStores && !this.disposed) {
+        this.pendingStores = false;
+        this.setStores(this.stores, this.activeStoreId);
+      }
+    });
     this.clock.start();
     this.markDirty();
     this.raf = requestAnimationFrame(this.tick);
@@ -203,6 +231,10 @@ export class WorldEngine {
   setStores(stores: WorldStore[], activeStoreId: string | null) {
     this.stores = stores;
     this.activeStoreId = activeStoreId;
+    if (!this.charsLoaded) {
+      this.pendingStores = true;
+      return;
+    }
     this.layout();
     // remove shops no longer present
     for (const [id, node] of this.shops) {
@@ -478,6 +510,13 @@ export class WorldEngine {
     }
     const maxDim = Math.max(cols, rows);
     this.baseR = Math.max(10, maxDim * SP * 1.15);
+    // keep shadows covering the whole lattice as it grows (the town is only shadowed inside this box)
+    const ext = Math.max(14, maxDim * SP * 0.8);
+    const sc = this.sun.shadow.camera;
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
+    sc.far = Math.max(60, ext * 4);
+    this.sun.position.set(ext * 0.6, ext * 1.2, ext * 0.45);
+    sc.updateProjectionMatrix();
     this.controls.maxDistance = this.baseR * 2.6;
   }
 
@@ -504,13 +543,51 @@ export class WorldEngine {
     return max > 0 ? Math.max(0.3, Math.sqrt(store.salesToday / max)) : 0.4;
   }
 
+  /**
+   * A Kenney building for this shop, picked by how busy the shop is (busier = taller), or null when the
+   * models aren't available. Materials are cloned per shop so each can glow on its own.
+   */
+  private kenneyShopBody(store: WorldStore) {
+    const names = available(KENNEY.buildings);
+    if (!names.length) return null;
+    const FIT = 1.9; // footprint of the building, inside the 2.5 plinth
+    const ranked = names
+      .map((n) => {
+        const m = kenneyModel(n)!;
+        return { n, h: (m.size.y / Math.max(m.size.x, m.size.z)) * FIT };
+      })
+      .sort((a, b) => a.h - b.h);
+    let seed = 0;
+    for (const c of store.storeId) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+    const base = Math.round(((this.prominence(store) - 0.3) / 0.7) * (ranked.length - 1));
+    const idx = Math.max(0, Math.min(ranked.length - 1, base + ((seed % 3) - 1)));
+    const pick = ranked[idx];
+    const m = kenneyModel(pick.n)!;
+    m.object.scale.setScalar(FIT / Math.max(m.size.x, m.size.z));
+    m.object.position.y = 0.03;
+    const mats: THREE.MeshStandardMaterial[] = [];
+    m.object.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+      mat.emissive = new THREE.Color(PAL.ember);
+      mat.emissiveIntensity = 0;
+      mesh.material = mat;
+      mats.push(mat);
+    });
+    return { object: m.object, height: pick.h, mats };
+  }
+
   private buildShop(store: WorldStore, pos: THREE.Vector3): ShopNode {
-    const h = 0.9 + this.prominence(store) * 2.4;
+    let h = 0.9 + this.prominence(store) * 2.4;
+    const km0 = this.kenneyShopBody(store);
+    if (km0) h = km0.height;
     const group = new THREE.Group();
     group.position.copy(pos);
     group.userData = { kind: "shop", storeId: store.storeId };
 
     const active = store.storeId === this.activeStoreId;
+    const km = km0;
     const wallMat = new THREE.MeshStandardMaterial({
       color: active ? PAL.stone50 : PAL.stone100,
       emissive: new THREE.Color(PAL.ember),
@@ -530,58 +607,75 @@ export class WorldEngine {
     let seed = 0;
     for (const c of store.storeId) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
 
-    // body on a plinth
-    add(2.5, 0.12, 2.5, std(PAL.stone400, 0.9), 0, 0.06, 0);
-    const body = add(2.4, h, 2.4, wallMat, 0, h / 2, 0);
-    void body;
+    // soft contact shadow so the building sits on the pavement instead of floating on it
+    const cs = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 4.0), new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: 0.55 }));
+    cs.rotation.x = -Math.PI / 2;
+    cs.position.y = 0.045;
+    group.add(cs);
 
-    // shopfront: two display windows either side of the door, framed
-    for (const sx of [-0.78, 0.78]) {
-      add(0.66, 0.6, 0.04, frame, sx, 0.66, 1.205);
-      add(0.56, 0.5, 0.05, glass, sx, 0.66, 1.21);
-    }
-    // upper floors get a row of windows on the front and both sides
-    for (let y = 1.55; y < h - 0.35; y += 0.7) {
-      for (const sx of [-0.78, 0, 0.78]) add(0.42, 0.4, 0.05, glass, sx, y, 1.205);
-      for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.4, 0.42, glass, sx * 1.205, y, sz);
-    }
-    for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.5, 0.42, glass, sx * 1.205, 0.8, sz);
-
-    // door with a frame and a step
-    add(0.7, 1.08, 0.05, frame, 0, 0.54, 1.205);
-    add(0.58, 0.98, 0.06, std(PAL.stone600, 0.85), 0, 0.5, 1.215);
-    add(0.8, 0.06, 0.3, std(PAL.stone300, 0.9), 0, 0.09, 1.36);
-
-    // striped awning, sloped, in the shop's brand colour
-    for (let i = 0; i < 6; i++) {
-      const seg = add(0.4, 0.05, 0.5, std(i % 2 ? "#f8f7f4" : brand, 0.6), -1 + i * 0.4 + 0.2, 1.3, 1.45);
-      seg.rotation.x = 0.32;
-    }
-    // sign board above the awning when the building is tall enough
-    if (h > 2.1) add(1.3, 0.28, 0.06, std(brand, 0.6), 0, Math.min(h - 0.4, 1.82), 1.23);
-
-    // roof: ledge, then a rooftop detail that differs per shop
-    add(2.62, 0.14, 2.62, std(PAL.stone300, 0.8), 0, h + 0.07, 0);
-    add(2.3, 0.04, 2.3, std(PAL.rose300, 0.75), 0, h + 0.16, 0);
-    const detail = seed % 3;
-    if (detail === 0) {
-      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), std("#8a95a5", 0.5));
-      tank.position.set(0.6, h + 0.42, -0.5);
-      group.add(tank);
-      add(0.5, 0.3, 0.5, frame, 0.6, h + 0.2, -0.5);
-    } else if (detail === 1) {
-      add(0.6, 0.3, 0.45, std("#a9a498", 0.6), -0.5, h + 0.33, -0.4);
-      add(0.4, 0.22, 0.3, std("#a9a498", 0.6), 0.5, h + 0.29, 0.3);
+    if (km) {
+      group.add(km.object);
+      // a small planter by the door keeps the pavement from looking bare
+      add(0.3, 0.2, 0.3, std("#8a6a47", 0.9), -1.0, 0.22, 1.45);
+      const shrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), std("#5f9e63", 0.9));
+      shrub.position.set(-1.0, 0.45, 1.45);
+      group.add(shrub);
     } else {
-      add(0.9, 0.5, 0.7, std(PAL.stone200), 0.4, h + 0.4, -0.5);
-      add(0.95, 0.05, 0.75, std(PAL.rose400), 0.4, h + 0.68, -0.5);
-    }
+      // body on a plinth
+      add(2.5, 0.12, 2.5, std(PAL.stone400, 0.9), 0, 0.06, 0);
+      const body = add(2.4, h, 2.4, wallMat, 0, h / 2, 0);
+      void body;
 
-    // a planter by the door
-    add(0.3, 0.2, 0.3, std("#8a6a47", 0.9), -1.0, 0.22, 1.45);
-    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), std("#5f9e63", 0.9));
-    bush.position.set(-1.0, 0.45, 1.45);
-    group.add(bush);
+      // shopfront: two display windows either side of the door, framed
+      for (const sx of [-0.78, 0.78]) {
+        add(0.66, 0.6, 0.04, frame, sx, 0.66, 1.205);
+        add(0.56, 0.5, 0.05, glass, sx, 0.66, 1.21);
+      }
+      // upper floors get a row of windows on the front and both sides
+      for (let y = 1.55; y < h - 0.35; y += 0.7) {
+        for (const sx of [-0.78, 0, 0.78]) add(0.42, 0.4, 0.05, glass, sx, y, 1.205);
+        for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.4, 0.42, glass, sx * 1.205, y, sz);
+      }
+      for (const sx of [-1, 1]) for (const sz of [-0.55, 0.55]) add(0.05, 0.5, 0.42, glass, sx * 1.205, 0.8, sz);
+
+      // door with a frame and a step
+      add(0.7, 1.08, 0.05, frame, 0, 0.54, 1.205);
+      add(0.58, 0.98, 0.06, std(PAL.stone600, 0.85), 0, 0.5, 1.215);
+      add(0.8, 0.06, 0.3, std(PAL.stone300, 0.9), 0, 0.09, 1.36);
+
+      // striped awning, sloped, in the shop's brand colour
+      for (let i = 0; i < 6; i++) {
+        const seg = add(0.4, 0.05, 0.5, std(i % 2 ? "#f8f7f4" : brand, 0.6), -1 + i * 0.4 + 0.2, 1.3, 1.45);
+        seg.rotation.x = 0.32;
+      }
+      // sign board above the awning when the building is tall enough
+      if (h > 2.1) add(1.3, 0.28, 0.06, std(brand, 0.6), 0, Math.min(h - 0.4, 1.82), 1.23);
+
+      // roof: ledge, then a rooftop detail that differs per shop
+      add(2.62, 0.14, 2.62, std(PAL.stone300, 0.8), 0, h + 0.07, 0);
+      add(2.3, 0.04, 2.3, std(PAL.rose300, 0.75), 0, h + 0.16, 0);
+      const detail = seed % 3;
+      if (detail === 0) {
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), std("#8a95a5", 0.5));
+        tank.position.set(0.6, h + 0.42, -0.5);
+        group.add(tank);
+        add(0.5, 0.3, 0.5, frame, 0.6, h + 0.2, -0.5);
+      } else if (detail === 1) {
+        add(0.6, 0.3, 0.45, std("#a9a498", 0.6), -0.5, h + 0.33, -0.4);
+        add(0.4, 0.22, 0.3, std("#a9a498", 0.6), 0.5, h + 0.29, 0.3);
+      } else {
+        add(0.9, 0.5, 0.7, std(PAL.stone200), 0.4, h + 0.4, -0.5);
+        add(0.95, 0.05, 0.75, std(PAL.rose400), 0.4, h + 0.68, -0.5);
+      }
+
+      // a planter by the door
+      add(0.3, 0.2, 0.3, std("#8a6a47", 0.9), -1.0, 0.22, 1.45);
+      const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), std("#5f9e63", 0.9));
+      bush.position.set(-1.0, 0.45, 1.45);
+      group.add(bush);
+
+
+    }
 
     if (store.lowStock > 0) {
       const pennant = new THREE.Mesh(
@@ -606,7 +700,7 @@ export class WorldEngine {
       if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
     });
     this.scene.add(group);
-    return { group, wallMat, store, pos: pos.clone(), pulse: 0, selected: false };
+    return { group, wallMats: km ? km.mats : [wallMat], store, pos: pos.clone(), pulse: 0, selected: false };
   }
 
   // ---- agents -----------------------------------------------------------
@@ -619,14 +713,25 @@ export class WorldEngine {
     const g = new THREE.Group();
     g.position.set(entryX, 0, streetZ);
     g.userData = { kind: "truck", storeId };
-    g.add(mesh(new THREE.BoxGeometry(2.0, 1.1, 1.1), PAL.stone50, [-0.4, 0.75, 0]));
-    g.add(mesh(new THREE.BoxGeometry(0.9, 0.86, 1.04), PAL.ember, [1.0, 0.62, 0]));
-    g.add(mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), PAL.crate, [-0.6, 1.55, 0.25]));
-    g.add(mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), PAL.crate, [-0.1, 1.55, -0.22]));
-    for (const [wx, wz] of [[0.8, 0.5], [0.8, -0.5], [-0.9, 0.5], [-0.9, -0.5]] as const) {
-      const wheel = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 14), PAL.stone900, [wx, 0.28, wz]);
-      wheel.rotation.x = Math.PI / 2;
-      g.add(wheel);
+    // same Kenney delivery truck as inside the shop; the code-built box truck is only a fallback
+    const km = kenneyModel("cars/delivery");
+    if (km) {
+      // face +x (the way it drives) and fit the road lane
+      km.object.scale.setScalar(1.15 / Math.min(km.size.x, km.size.z));
+      km.object.rotation.y = Math.PI / 2;
+      km.object.position.y = 0.02;
+      g.add(km.object);
+    } else {
+      g.add(mesh(new THREE.BoxGeometry(2.0, 1.1, 1.1), PAL.stone50, [-0.4, 0.75, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.9, 0.86, 1.04), PAL.ember, [1.0, 0.62, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), PAL.crate, [-0.6, 1.55, 0.25]));
+      g.add(mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), PAL.crate, [-0.1, 1.55, -0.22]));
+      for (const [wx, wz] of [[0.8, 0.5], [0.8, -0.5], [-0.9, 0.5], [-0.9, -0.5]] as const) {
+        const wheel = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 14), PAL.stone900, [wx, 0.28, wz]);
+        wheel.rotation.x = Math.PI / 2;
+        g.add(wheel);
+      }
+
     }
     this.scene.add(g);
 
@@ -696,7 +801,7 @@ export class WorldEngine {
       : { kind: "customer", pickable: false };
     // a real person (rigged body), scaled to sit right beside the toy-scale shops
     const person = makePerson({ skin: "#d9a47c", shirt: color });
-    person.group.scale.setScalar(0.9);
+    person.group.scale.setScalar(0.52); // toy-scale people, as tall as the shop doors
     g.add(person.group);
     // generous invisible hit area so tapping a person is easy
     const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.3, 8), new THREE.MeshBasicMaterial({ visible: false }));
@@ -906,9 +1011,10 @@ export class WorldEngine {
         dirty = true;
       }
       const targetEmis = (node.selected ? 0.5 : 0) + node.pulse * 0.7;
-      const cur = node.wallMat.emissiveIntensity;
+      const cur = node.wallMats[0].emissiveIntensity;
       if (Math.abs(cur - targetEmis) > 0.002) {
-        node.wallMat.emissiveIntensity = cur + (targetEmis - cur) * Math.min(1, dt * 8);
+        const next = cur + (targetEmis - cur) * Math.min(1, dt * 8);
+        for (const m of node.wallMats) m.emissiveIntensity = next;
         dirty = true;
       }
     }

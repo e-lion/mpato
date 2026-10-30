@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { PAL } from "./palette";
+import { KENNEY, available, kenneyModel } from "./kenney";
 
 /**
  * The streets and blocks around the shops: clean flat-shaded isometric town built from boxes.
@@ -133,7 +134,7 @@ export class Town {
         const jz = zAt(r) + (ROAD.zNear + ROAD.zFar) / 2;
         for (const sx of [xAt(k) + 1.8, xAt(k) + 4.2]) {
           if (sx < xMin || sx > xMax) continue;
-          for (let i = -2; i <= 2; i++) this.paint(sx + i * 0.11, jz, 0.06, 0.78); // crossing a horizontal road
+          for (let i = -1; i <= 1; i++) this.paint(sx + i * 0.16, jz, 0.07, 0.7); // crossing a horizontal road
         }
       }
     }
@@ -142,7 +143,7 @@ export class Town {
       for (let r = r0; r <= r1; r++) {
         for (const sz of [zAt(r) + 1.7, zAt(r) + 4.05]) {
           if (sz < zMin || sz > zMax) continue;
-          for (let i = -2; i <= 2; i++) this.paint(jx, sz + i * 0.11, 0.78, 0.06); // crossing a vertical road
+          for (let i = -1; i <= 1; i++) this.paint(jx, sz + i * 0.16, 0.7, 0.07); // crossing a vertical road
         }
       }
     }
@@ -218,7 +219,30 @@ export class Town {
     this.group.add(m);
   }
 
+  /** Place a Kenney model by flattening its meshes into this group, so bake() can merge them like everything else. */
+  private model(name: string, x: number, z: number, opts: { scale?: number; fitWidth?: number; rotY?: number; y?: number } = {}) {
+    const m = kenneyModel(name);
+    if (!m) return false;
+    const s = opts.fitWidth ? opts.fitWidth / Math.max(m.size.x, m.size.z) : (opts.scale ?? 1);
+    m.object.scale.setScalar(s);
+    m.object.rotation.y = opts.rotY ?? 0;
+    m.object.position.set(x, opts.y ?? 0.03, z);
+    m.object.updateWorldMatrix(true, true);
+    m.object.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const copy = new THREE.Mesh(mesh.geometry, mesh.material);
+      copy.applyMatrix4(mesh.matrixWorld);
+      copy.castShadow = true;
+      copy.receiveShadow = true;
+      this.group.add(copy);
+    });
+    return true;
+  }
+
   private tree(x: number, z: number, s: number, R: () => number) {
+    const trees = available(KENNEY.trees);
+    if (trees.length && this.model(trees[Math.floor(R() * trees.length)], x, z, { scale: 1.55 * s, rotY: R() * Math.PI * 2 })) return;
     this.box(0.1 * s, 0.34 * s, 0.1 * s, PALETTE.trunk, x, 0.2 * s, z);
     const leaf = PALETTE.leaf[Math.floor(R() * PALETTE.leaf.length)];
     const crown = new THREE.Mesh(this.geo("crown", () => new THREE.IcosahedronGeometry(0.3, 0)), this.mat(leaf, 0.95));
@@ -229,6 +253,9 @@ export class Town {
   }
 
   private lamp(x: number, z: number) {
+    const lights = available(KENNEY.lights);
+    // the lamp arm should reach out over the road: facing +x on the east kerb, -x on the west
+    if (lights.length && this.model(lights[0], x, z, { scale: 1.6, rotY: x > 0 ? -Math.PI / 2 : Math.PI / 2 })) return;
     this.box(0.04, 0.78, 0.04, "#4a453c", x, 0.4, z, { cast: true });
     this.box(0.16, 0.05, 0.1, "#4a453c", x, 0.8, z);
     this.box(0.12, 0.03, 0.08, "#fff3c9", x, 0.775, z);
@@ -276,6 +303,20 @@ export class Town {
 
   /** Background buildings: varied footprints and heights, taller and calmer the further out. */
   private backdrop(cx: number, cz: number, ring: number, R: () => number) {
+    const houses = available(KENNEY.houses);
+    const towers = available(KENNEY.buildings);
+    if (towers.length) {
+      // outer ring: mid-rise and towers; the ring beside the shops: low commercial and houses
+      const useHouse = houses.length > 0 && ring < 2 && R() < 0.45;
+      const pool = useHouse ? houses : ring >= 2 ? towers.filter((n) => /skyscraper|building-[g-m]$/.test(n)) : towers.filter((n) => !/skyscraper/.test(n));
+      const list = pool.length ? pool : towers;
+      const name = list[Math.floor(R() * list.length)];
+      const width = useHouse ? 3.2 : ring >= 2 ? 2.7 + R() * 0.8 : 2.4 + R() * 0.7;
+      if (this.model(name, cx, cz, { fitWidth: width })) {
+        if (R() < 0.7) this.tree(cx + (R() < 0.5 ? -2 : 2), cz + 1.9, 0.8 + R() * 0.3, R);
+        return;
+      }
+    }
     const n = R() < 0.35 ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const w = n === 2 ? 1.9 + R() * 0.4 : 2.6 + R() * 1.4;

@@ -7,6 +7,7 @@ import { makePerson, randomLook, type Person } from "./people";
 import { Tweens, easeInOut, easeOut } from "./tween";
 import { walkPath } from "./walk";
 import { fitModel, loadGltfScene } from "./assets";
+import { kenneyModel } from "./kenney";
 import type { DeliverySceneEvent } from "./bus";
 
 const PARK_X = 1.0;
@@ -160,7 +161,9 @@ export class DeliveryScene {
     this.arriving = true;
     // Resolve the model BEFORE building anything, so the truck that drives in is the truck that parks
     // (building a placeholder and swapping the real model in mid-drive made it change shape).
-    void loadGltfScene("/models/truck.glb").then((model) => {
+    // the Kenney delivery truck matches the one on the map; fall back to the older truck.glb, then to the code-built one
+    const kenney = kenneyModel("cars/delivery")?.object ?? null;
+    void (kenney ? Promise.resolve(kenney) : loadGltfScene("/models/truck.glb")).then((model) => {
       this.arriving = false;
       if (this.truck || this.truckName !== name) return; // supplier changed while loading
       const truck = buildTruck(name, model);
